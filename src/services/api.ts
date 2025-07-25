@@ -1,4 +1,6 @@
-const API_BASE_URL = 'http://localhost:8080';
+// const API_BASE_URL = 'http://localhost:8080'; 
+const API_BASE_URL = 'https://canva-ai-backend-sandeep.onrender.com';
+
 
 export interface AIResponse {
   content: string;
