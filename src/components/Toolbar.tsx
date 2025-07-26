@@ -86,7 +86,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
         <button
           onClick={toggleList}
-          className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-yellow-50 hover:text-yellow-700 rounded-md transition-all duration-200 font-medium"
+          className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-red-50 hover:text-red-700 rounded-md transition-all duration-200 font-medium"
           title="Export as Image"
         >
           <ListIcon className="w-4 h-4" />
