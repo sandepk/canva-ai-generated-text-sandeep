@@ -12,6 +12,8 @@ A modern, interactive canvas application where users can create, edit, and manag
 - **Responsive Design**: Works on all screen sizes
 - **CanvasToImage**: html2canvas to convert html to image
 - **LocalStorage**: Persistent for Local storage
+- **Show Node List**: Show all nodes list present in canvas
+- **Undo Redo**: Buttons to undo and redo the nodes updates / creation / deletion
 
 ## Getting Started
 
@@ -100,11 +102,15 @@ The built files will be in the `dist` directory.
 
 ## Backend:
 
+```bash
 cd server
 npm install
 node server.js
+```
 
 ## Frontend:
 
+```bash
 npm install
 npm run dev
+```
