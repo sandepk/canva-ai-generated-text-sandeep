@@ -21,7 +21,6 @@ const LOCAL_STORAGE_KEY = "ai-canvas-nodes";
 
 const Canvas: React.FC = () => {
   const [nodes, setNodes] = useState<Node[]>(() => {
-    // Load from localStorage on initial render
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
       return saved ? JSON.parse(saved) : [];
@@ -29,14 +28,37 @@ const Canvas: React.FC = () => {
       return [];
     }
   });
+  const [undoStack, setUndoStack] = useState<Node[][]>([]);
+  const [redoStack, setRedoStack] = useState<Node[][]>([]);
+
+  const pushToUndoStack = useCallback((prevNodes: Node[]) => {
+    setUndoStack((stack) => [...stack, prevNodes]);
+    setRedoStack([]);
+  }, []);
+
+  const undo = () => {
+    if (undoStack.length > 0) {
+      const lastState = undoStack[undoStack.length - 1];
+      setUndoStack((stack) => stack.slice(0, -1)); // removes the last recent item
+      setRedoStack((stack) => [...stack, nodes]);
+      setNodes(lastState);
+    }
+  };
+
+  const redo = () => {
+    if (redoStack.length > 0) {
+      const nextState = redoStack[redoStack.length - 1];
+      setRedoStack((stack) => stack.slice(0, -1));
+      setUndoStack((stack) => [...stack, nodes]);
+      setNodes(nextState);
+    }
+  };
+
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(
     null,
   );
   const [showNodeList, setShowNodeList] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nodes));
-  }, [nodes]);
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
     dragOffset: { x: 0, y: 0 },
@@ -51,6 +73,7 @@ const Canvas: React.FC = () => {
 
   const createNode = useCallback(
     (x: number, y: number, text: string = "New Node") => {
+      pushToUndoStack(nodes);
       const newNode: Node = {
         id: generateId(),
         x,
@@ -63,23 +86,31 @@ const Canvas: React.FC = () => {
       setNodes((prev) => [...prev, newNode]);
       return newNode.id;
     },
-    [],
+    [nodes, pushToUndoStack],
   );
 
-  const updateNode = useCallback((id: string, updates: Partial<Node>) => {
-    setNodes((prev) =>
-      prev.map((node) => (node.id === id ? { ...node, ...updates } : node)),
-    );
-  }, []);
+  const updateNode = useCallback(
+    (id: string, updates: Partial<Node>) => {
+      pushToUndoStack(nodes);
+      setNodes((prev) =>
+        prev.map((node) => (node.id === id ? { ...node, ...updates } : node)),
+      );
+    },
+    [nodes, pushToUndoStack],
+  );
 
-  const deleteNode = useCallback((id: string) => {
-    setNodes((prev) => prev.filter((node) => node.id !== id));
-  }, []);
+  const deleteNode = useCallback(
+    (id: string) => {
+      pushToUndoStack(nodes);
+      setNodes((prev) => prev.filter((node) => node.id !== id));
+    },
+    [nodes, pushToUndoStack],
+  );
 
   const handleCanvasClick = (e: React.MouseEvent) => {
     if (e.target === canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left - 100; // Center the node
+      const x = e.clientX - rect.left - 100;
       const y = e.clientY - rect.top - 50;
       createNode(x, y);
     }
@@ -90,17 +121,13 @@ const Canvas: React.FC = () => {
     nodeId: string,
   ) => {
     e.preventDefault();
-
     const node = nodes.find((n) => n.id === nodeId);
     if (!node || !canvasRef.current) return;
-
     const rect = canvasRef.current.getBoundingClientRect();
-
     const clientX =
       "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const clientY =
       "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-
     const offsetX = clientX - rect.left - node.x;
     const offsetY = clientY - rect.top - node.y;
 
@@ -112,7 +139,6 @@ const Canvas: React.FC = () => {
 
     const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
       if (!canvasRef.current) return;
-
       const moveX =
         moveEvent instanceof TouchEvent
           ? moveEvent.touches[0].clientX
@@ -121,10 +147,8 @@ const Canvas: React.FC = () => {
         moveEvent instanceof TouchEvent
           ? moveEvent.touches[0].clientY
           : (moveEvent as MouseEvent).clientY;
-
       const x = moveX - rect.left - offsetX;
       const y = moveY - rect.top - offsetY;
-
       updateNode(nodeId, { x, y });
     };
 
@@ -134,7 +158,6 @@ const Canvas: React.FC = () => {
         dragOffset: { x: 0, y: 0 },
         nodeId: null,
       });
-
       document.removeEventListener("mousemove", handleMove);
       document.removeEventListener("mouseup", handleEnd);
       document.removeEventListener("touchmove", handleMove);
@@ -147,56 +170,62 @@ const Canvas: React.FC = () => {
     document.addEventListener("touchend", handleEnd);
   };
 
-  const handleNodeEdit = (nodeId: string) => {
+  const handleNodeEdit = (nodeId: string) =>
     updateNode(nodeId, { isEditing: true });
-  };
-
-  const handleNodeSave = (nodeId: string, text: string) => {
+  const handleNodeSave = (nodeId: string, text: string) =>
     updateNode(nodeId, { text, isEditing: false });
-  };
 
-  const handleAIRequest = (prompt: string, nodeId?: string) => {
-    return new Promise<void>(async (resolve, reject) => {
+  const handleAIRequest = (prompt: string, nodeId?: string) =>
+    new Promise<void>(async (resolve, reject) => {
       try {
         const aiResponse = await generateText(prompt);
-
-        if (nodeId) {
-          // Update existing node
-          updateNode(nodeId, { text: aiResponse });
-        } else {
-          // Create new node
+        if (nodeId) updateNode(nodeId, { text: aiResponse });
+        else {
           const rect = canvasRef.current?.getBoundingClientRect();
-          if (rect) {
+          if (rect)
             createNode(
               Math.random() * (rect.width - 200),
               Math.random() * (rect.height - 100),
               aiResponse,
             );
-          }
         }
         resolve();
       } catch (error) {
-        console.error("AI Request failed:", error);
         const errorMessage =
           error instanceof Error ? error.message : "Failed to generate content";
-
-        if (nodeId) {
-          updateNode(nodeId, { text: `Error: ${errorMessage}` });
-        } else {
+        if (nodeId) updateNode(nodeId, { text: `Error: ${errorMessage}` });
+        else {
           const rect = canvasRef.current?.getBoundingClientRect();
-          if (rect) {
+          if (rect)
             createNode(
               Math.random() * (rect.width - 200),
               Math.random() * (rect.height - 100),
               `Error: ${errorMessage}`,
             );
-          }
         }
         reject(error);
       }
     });
-  };
 
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nodes));
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Z or Cmd+Z
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        undo();
+      }
+
+      // Ctrl+Y or Cmd+Y
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undoStack, redoStack, nodes]);
   const exportToJSON = () => {
     const json = JSON.stringify(nodes, null, 2);
     const blob = new Blob([json], { type: "application/json" });
@@ -210,11 +239,9 @@ const Canvas: React.FC = () => {
 
   const exportToImage = async () => {
     if (!canvasRef.current) return;
-    const canvasElement = canvasRef.current;
     try {
-      const canvas = await html2canvas(canvasElement);
+      const canvas = await html2canvas(canvasRef.current);
       const imgData = canvas.toDataURL("image/png");
-
       const a = document.createElement("a");
       a.href = imgData;
       a.download = "canvas.png";
@@ -229,13 +256,10 @@ const Canvas: React.FC = () => {
       if (nodes.length === 0) {
         canvasRef.current.scrollTop = 0;
         canvasRef.current.scrollLeft = 0;
-
-        // Reset size when no nodes
         canvasRef.current.style.minWidth = "100%";
         canvasRef.current.style.minHeight = "100%";
         setShowNodeList(false);
       } else {
-        // Restore canvas to large size when nodes exist
         canvasRef.current.style.minWidth = "1500px";
         canvasRef.current.style.minHeight = "1500px";
       }
@@ -251,6 +275,8 @@ const Canvas: React.FC = () => {
         onExportJSON={exportToJSON}
         onExportImage={exportToImage}
         toggleList={() => setShowNodeList(!showNodeList)}
+        onUndo={undo}
+        onRedo={redo}
       />
 
       <div
@@ -267,7 +293,6 @@ const Canvas: React.FC = () => {
             backgroundSize: "20px 20px",
           }}
         >
-          {/* Nodes */}
           {nodes.map((node) => (
             <CanvasNode
               key={node.id}
@@ -285,7 +310,6 @@ const Canvas: React.FC = () => {
             />
           ))}
 
-          {/* Empty state */}
           {nodes.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="text-center text-gray-400">
@@ -312,6 +336,7 @@ const Canvas: React.FC = () => {
           selectedNodeId={selectedNodeId}
         />
       )}
+
       {showNodeList && (
         <NodeList
           nodes={nodes}
@@ -319,28 +344,18 @@ const Canvas: React.FC = () => {
           onSelectNode={(id) => {
             const node = nodes.find((n) => n.id === id);
             const scrollContainer = scrollContainerRef.current;
-
             if (!node || !scrollContainer) return;
-
-            // Calculate the center of the node
             const nodeCenterX = node.x + node.width / 2;
             const nodeCenterY = node.y + node.height / 2;
-
-            // Scroll values to center node in scroll container
             const scrollLeft = nodeCenterX - scrollContainer.clientWidth / 2;
             const scrollTop = nodeCenterY - scrollContainer.clientHeight / 2;
-
             scrollContainer.scrollTo({
               left: scrollLeft,
               top: scrollTop,
               behavior: "smooth",
             });
-
             setHighlightedNodeId(id);
-
-            setTimeout(() => {
-              setHighlightedNodeId(null);
-            }, 2000);
+            setTimeout(() => setHighlightedNodeId(null), 2000);
           }}
         />
       )}
