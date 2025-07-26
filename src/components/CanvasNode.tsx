@@ -5,7 +5,7 @@ import { Edit, Trash2, Bot, GripHorizontal } from 'lucide-react';
 interface CanvasNodeProps {
   node: Node;
   isDragging: boolean;
-  onMouseDown: (e: React.MouseEvent) => void;
+  onMouseDown: (e: React.MouseEvent | React.TouchEvent) => void;
   onEdit: () => void;
   onSave: (text: string) => void;
   onDelete: () => void;
@@ -60,8 +60,8 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
 
   return (
     <div
-      className={`absolute select-none group transition-all duration-200 ${
-        isDragging ? 'scale-105 shadow-2xl z-50' : 'hover:shadow-lg'
+      className={`absolute select-none touch-none group transition-all duration-200 ${
+        isDragging ? 'scale-105 z-50' : 'hover:scale-105'
       }`}
       style={{
         left: node.x,
@@ -76,6 +76,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
         className="relative w-full h-full rounded-lg border-2 border-white shadow-md transition-all duration-200 cursor-move"
         style={{ backgroundColor: node.color + '15', borderColor: node.color + '40' }}
         onMouseDown={onMouseDown}
+        onTouchStart={onMouseDown}
         onDoubleClick={handleDoubleClick}
       >
         {/* Drag Handle */}
@@ -148,11 +149,6 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
           </div>
         )}
 
-        {/* Color Indicator */}
-        <div
-          className="absolute bottom-2 left-2 w-3 h-3 rounded-full opacity-60"
-          style={{ backgroundColor: node.color }}
-        />
       </div>
     </div>
   );

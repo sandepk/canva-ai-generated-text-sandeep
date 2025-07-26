@@ -75,45 +75,66 @@ const Canvas: React.FC = () => {
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent, nodeId: string) => {
+  const handleStartDrag = (
+    e: React.MouseEvent | React.TouchEvent,
+    nodeId: string
+  ) => {
     e.preventDefault();
+  
     const node = nodes.find(n => n.id === nodeId);
-    if (!node) return;
-
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const offsetX = e.clientX - rect.left - node.x;
-    const offsetY = e.clientY - rect.top - node.y;
-
+    if (!node || !canvasRef.current) return;
+  
+    const rect = canvasRef.current.getBoundingClientRect();
+  
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+  
+    const offsetX = clientX - rect.left - node.x;
+    const offsetY = clientY - rect.top - node.y;
+  
     setDragState({
       isDragging: true,
       dragOffset: { x: offsetX, y: offsetY },
       nodeId,
     });
-
-    const handleMouseMove = (e: MouseEvent) => {
+  
+    const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
       if (!canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left - offsetX;
-      const y = e.clientY - rect.top - offsetY;
-      
+  
+      const moveX =
+        moveEvent instanceof TouchEvent
+          ? moveEvent.touches[0].clientX
+          : (moveEvent as MouseEvent).clientX;
+      const moveY =
+        moveEvent instanceof TouchEvent
+          ? moveEvent.touches[0].clientY
+          : (moveEvent as MouseEvent).clientY;
+  
+      const x = moveX - rect.left - offsetX;
+      const y = moveY - rect.top - offsetY;
+  
       updateNode(nodeId, { x, y });
     };
-
-    const handleMouseUp = () => {
+  
+    const handleEnd = () => {
       setDragState({
         isDragging: false,
         dragOffset: { x: 0, y: 0 },
         nodeId: null,
       });
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+  
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleEnd);
+      document.removeEventListener('touchmove', handleMove);
+      document.removeEventListener('touchend', handleEnd);
     };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+  
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('touchmove', handleMove);
+    document.addEventListener('touchend', handleEnd);
   };
+  
 
   const handleNodeEdit = (nodeId: string) => {
     updateNode(nodeId, { isEditing: true });
@@ -217,7 +238,7 @@ const Canvas: React.FC = () => {
             key={node.id}
             node={node}
             isDragging={dragState.isDragging && dragState.nodeId === node.id}
-            onMouseDown={(e) => handleMouseDown(e, node.id)}
+            onMouseDown={(e) => handleStartDrag(e, node.id)}
             onEdit={() => handleNodeEdit(node.id)}
             onSave={(text) => handleNodeSave(node.id, text)}
             onDelete={() => deleteNode(node.id)}
