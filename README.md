@@ -10,7 +10,7 @@ A modern, interactive canvas application where users can create, edit, and manag
 - **AI Assistant**: Generate new content or update existing nodes
 - **Visual Feedback**: Smooth animations and hover effects
 - **Responsive Design**: Works on all screen sizes
-- **CanvasToImage**:  html2canvas to convert html to image
+- **CanvasToImage**: html2canvas to convert html to image
 - **LocalStorage**: Persistent for Local storage
 
 ## Getting Started
@@ -24,11 +24,13 @@ A modern, interactive canvas application where users can create, edit, and manag
 
 1. Clone or download this repository
 2. Install dependencies:
+
    ```bash
    npm install
    ```
 
 3. Start the development server:
+
    ```bash
    npm run dev
    ```
@@ -38,22 +40,26 @@ A modern, interactive canvas application where users can create, edit, and manag
 ## Usage
 
 ### Creating Nodes
+
 - Click anywhere on the canvas to create a new node
 - Use the "Add Node" button in the toolbar
 - Ask the AI assistant to generate content
 
 ### Editing Nodes
+
 - Double-click any node to edit its text
 - Press Enter to save, Escape to cancel
 - Use the edit button that appears on hover
 
 ### AI Assistant
+
 - Click the "AI Assistant" button to open the AI panel
 - Generate new nodes with custom prompts
 - Update existing nodes by clicking the AI button on any node
 - Use quick suggestions for common tasks
 
 ### Moving Nodes
+
 - Click and drag any node to move it around the canvas
 - Nodes will show visual feedback during dragging
 
@@ -90,18 +96,15 @@ src/
 npm run build
 ```
 
-
 The built files will be in the `dist` directory.
 
-
 ## Backend:
+
 cd server
 npm install
 node server.js
 
 ## Frontend:
+
 npm install
 npm run dev
-
-
-

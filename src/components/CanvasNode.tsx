@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Node } from '../types';
-import { Edit, Trash2, Bot, GripHorizontal } from 'lucide-react';
+import React, { useState, useRef, useEffect } from "react";
+import { Node } from "../types";
+import { Edit, Trash2, Bot, GripHorizontal } from "lucide-react";
 
 interface CanvasNodeProps {
   node: Node;
@@ -10,6 +10,7 @@ interface CanvasNodeProps {
   onSave: (text: string) => void;
   onDelete: () => void;
   onAIUpdate: (prompt: string) => void;
+  highlighted?: boolean;
 }
 
 const CanvasNode: React.FC<CanvasNodeProps> = ({
@@ -20,6 +21,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
   onSave,
   onDelete,
   onAIUpdate,
+  highlighted = false,
 }) => {
   const [editText, setEditText] = useState(node.text);
   const [showActions, setShowActions] = useState(false);
@@ -37,10 +39,10 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
   }, [node.text]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       onSave(editText);
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       setEditText(node.text);
       onSave(node.text);
     }
@@ -53,7 +55,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
 
   const adjustTextareaHeight = () => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   };
@@ -61,8 +63,8 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
   return (
     <div
       className={`absolute select-none touch-none group transition-all duration-200 ${
-        isDragging ? 'scale-105 z-50' : 'hover:scale-105'
-      }`}
+        isDragging ? "scale-105 z-50" : "hover:scale-105"
+      } ${highlighted ? "ring-4 ring-green-400 animate-pulse" : ""}`}
       style={{
         left: node.x,
         top: node.y,
@@ -74,7 +76,10 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
     >
       <div
         className="relative w-full h-full rounded-lg border-2 border-white shadow-md transition-all duration-200 cursor-move"
-        style={{ backgroundColor: node.color + '15', borderColor: node.color + '40' }}
+        style={{
+          backgroundColor: node.color + "15",
+          borderColor: node.color + "40",
+        }}
         onMouseDown={onMouseDown}
         onTouchStart={onMouseDown}
         onDoubleClick={handleDoubleClick}
@@ -82,7 +87,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
         {/* Drag Handle */}
         <div
           className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-          style={{ pointerEvents: showActions ? 'auto' : 'none' }}
+          style={{ pointerEvents: showActions ? "auto" : "none" }}
         >
           <GripHorizontal className="w-4 h-4 text-gray-400" />
         </div>
@@ -100,7 +105,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
               onKeyDown={handleKeyDown}
               onBlur={() => onSave(editText)}
               className="w-full bg-transparent border-none outline-none resize-none text-gray-800 font-medium text-sm leading-relaxed"
-              style={{ minHeight: '60px' }}
+              style={{ minHeight: "60px" }}
               placeholder="Enter your text..."
             />
           ) : (
@@ -108,7 +113,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
               className="w-full h-full text-gray-800 font-medium text-sm leading-relaxed whitespace-pre-wrap break-words cursor-text"
               onClick={handleDoubleClick}
             >
-              {node.text || 'Double-click to edit'}
+              {node.text || "Double-click to edit"}
             </div>
           )}
         </div>
@@ -119,7 +124,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onAIUpdate('');
+                onAIUpdate("");
               }}
               className="p-1.5 bg-purple-500 text-white rounded-full shadow-lg hover:bg-purple-600 transition-colors duration-200"
               title="Ask AI to update"
@@ -148,7 +153,6 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
             </button>
           </div>
         )}
-
       </div>
     </div>
   );

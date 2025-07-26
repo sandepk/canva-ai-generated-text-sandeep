@@ -1,6 +1,5 @@
-// const API_BASE_URL = 'http://localhost:8080'; 
-const API_BASE_URL = 'https://canva-ai-backend-sandeep.onrender.com';
-
+// const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = "https://canva-ai-backend-sandeep.onrender.com";
 
 export interface AIResponse {
   content: string;
@@ -13,25 +12,25 @@ export interface AIError {
 export const generateText = async (prompt: string): Promise<string> => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/generate-text`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ prompt }),
     });
 
     if (!response.ok) {
       const errorData: AIError = await response.json();
-      throw new Error(errorData.error || 'Failed to generate text');
+      throw new Error(errorData.error || "Failed to generate text");
     }
 
     const data: AIResponse = await response.json();
-    return data.content || 'No content generated';
+    return data.content || "No content generated";
   } catch (error) {
-    console.error('API Error:', error);
+    console.error("API Error:", error);
     if (error instanceof Error) {
       throw new Error(`AI Service Error: ${error.message}`);
     }
-    throw new Error('Unknown error occurred while generating text');
+    throw new Error("Unknown error occurred while generating text");
   }
 };

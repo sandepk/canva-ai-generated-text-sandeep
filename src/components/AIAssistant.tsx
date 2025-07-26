@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Bot, X, Send, Sparkles } from 'lucide-react';
+import React, { useState } from "react";
+import { Bot, X, Send, Sparkles } from "lucide-react";
 
 interface AIAssistantProps {
   onClose: () => void;
@@ -12,7 +12,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
   onSubmit,
   selectedNodeId,
 }) => {
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,11 +20,11 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
     if (!prompt.trim()) return;
 
     setIsLoading(true);
-    
+
     // Simulate AI processing delay
     setTimeout(() => {
       onSubmit(prompt);
-      setPrompt('');
+      setPrompt("");
       setIsLoading(false);
       onClose();
     }, 1000);
@@ -34,18 +34,18 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
     setPrompt(suggestion);
   };
 
-  const suggestions = selectedNodeId 
+  const suggestions = selectedNodeId
     ? [
-        'Make this more detailed',
-        'Summarize this content',
-        'Make it more professional',
-        'Add creative elements',
+        "Make this more detailed",
+        "Summarize this content",
+        "Make it more professional",
+        "Add creative elements",
       ]
     : [
-        'Create a project plan',
-        'Generate a brainstorm list',
-        'Write a meeting agenda',
-        'Create a task breakdown',
+        "Create a project plan",
+        "Generate a brainstorm list",
+        "Write a meeting agenda",
+        "Create a task breakdown",
       ];
 
   return (
@@ -60,7 +60,9 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
             <div>
               <h3 className="font-semibold text-gray-900">AI Assistant</h3>
               <p className="text-sm text-gray-500">
-                {selectedNodeId ? 'Update selected node' : 'Generate new content'}
+                {selectedNodeId
+                  ? "Update selected node"
+                  : "Generate new content"}
               </p>
             </div>
           </div>
@@ -76,14 +78,18 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
         <div className="flex-1 p-6 overflow-y-auto">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 mb-2">
-                What would you like me to {selectedNodeId ? 'update' : 'create'}?
+              <label
+                htmlFor="prompt"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                What would you like me to {selectedNodeId ? "update" : "create"}
+                ?
               </label>
               <textarea
                 id="prompt"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder={`Describe what you want${selectedNodeId ? ' to change' : ' to create'}...`}
+                placeholder={`Describe what you want${selectedNodeId ? " to change" : " to create"}...`}
                 className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none resize-none transition-all duration-200"
                 rows={4}
                 disabled={isLoading}
@@ -125,7 +131,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  {selectedNodeId ? 'Update Node' : 'Create Node'}
+                  {selectedNodeId ? "Update Node" : "Create Node"}
                 </>
               )}
             </button>
