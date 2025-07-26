@@ -13,7 +13,7 @@ const NodeList: React.FC<NodeListProps> = ({
   highlightedNodeId,
 }) => {
   return (
-    <div className="absolute top-11 right-2 z-40 bg-white shadow-lg rounded-lg p-4 w-64 max-h-[80vh] overflow-y-auto">
+    <div className="absolute top-[82px] lg:top-[53px] md:top-[73px] right-2 z-40 bg-white shadow-lg rounded-lg p-4 w-64 max-h-[80vh] overflow-y-auto">
       <div className="bg-blue-50 rounded-t-lg px-4 py-2 border-b border-gray-200">
         <h3 className="text-blue-800 text-base font-semibold tracking-wide">
           All Nodes
