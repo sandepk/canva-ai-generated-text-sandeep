@@ -28,6 +28,7 @@ const Canvas: React.FC = () => {
       return [];
     }
   });
+  const [minSize, setMinSize] = useState({ width: 0, height: 0 });
   const [undoStack, setUndoStack] = useState<Node[][]>([]);
   const [redoStack, setRedoStack] = useState<Node[][]>([]);
 
@@ -81,7 +82,7 @@ const Canvas: React.FC = () => {
         text,
         color: COLORS[Math.floor(Math.random() * COLORS.length)],
         width: 200,
-        height: 100,
+        height: 50,
       };
       setNodes((prev) => [...prev, newNode]);
       return newNode.id;
@@ -259,12 +260,20 @@ const Canvas: React.FC = () => {
         canvasRef.current.style.minWidth = "100%";
         canvasRef.current.style.minHeight = "100%";
         setShowNodeList(false);
-      } else {
-        canvasRef.current.style.minWidth = "1500px";
-        canvasRef.current.style.minHeight = "1500px";
       }
     }
   }, [nodes.length]);
+  useEffect(() => {
+    const updateSize = () => {
+      const width = Math.max(window.innerWidth * 1.5, 1200);
+      const height = Math.max(window.innerHeight * 1.5, 1200);
+      setMinSize({ width, height });
+    };
+
+    updateSize(); // Initial call
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
 
   return (
     <div className="relative w-full h-screen bg-gray-50 overflow-hidden">
@@ -286,11 +295,13 @@ const Canvas: React.FC = () => {
         <div
           ref={canvasRef}
           onClick={handleCanvasClick}
-          className={`relative ${nodes.length > 0 ? "min-w-[1500px] min-h-[1500px]" : "w-full h-full"} cursor-crosshair`}
+          className={`relative ${nodes.length === 0 ? "w-full h-full" : ""} cursor-crosshair`}
           style={{
             backgroundImage:
               "radial-gradient(circle, #e5e7eb 1px, transparent 1px)",
             backgroundSize: "20px 20px",
+            minWidth: nodes.length > 0 ? `${minSize.width}px` : undefined,
+            minHeight: nodes.length > 0 ? `${minSize.height}px` : undefined,
           }}
         >
           {nodes.map((node) => (
