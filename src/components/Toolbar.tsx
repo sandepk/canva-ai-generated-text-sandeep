@@ -28,7 +28,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
 }) => {
   return (
     <div className="fixed top-4 left-4 z-40 flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white/90 backdrop-blur-md rounded-xl p-3 shadow-lg border border-gray-200 max-w-[calc(100vw-2rem)]">
-      <div className="flex items-center gap-2 bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200 rounded-lg px-3 py-2 shadow-sm flex-shrink-0">
+      <a 
+        href="https://www.statisfy.com/" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="flex items-center gap-2 bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200 rounded-lg px-3 py-2 shadow-sm flex-shrink-0 hover:shadow-md transition-all duration-200 cursor-pointer"
+      >
         <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-lg">
           <svg 
             className="w-5 h-5 text-blue-600" 
@@ -52,7 +57,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             Statisfy demo
           </span>
         </div>
-      </div>
+      </a>
 
       {/* Toolbar Buttons */}
       <ToolbarActions

@@ -35,11 +35,16 @@ const ContextSidebar: React.FC<ContextSidebarProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+            <a 
+              href="https://canva-ai-generated-text-sandeep.vercel.app/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center hover:scale-110 transition-transform duration-200 cursor-pointer"
+            >
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
               </svg>
-            </div>
+            </a>
             <div>
               <h2 className="text-lg font-semibold text-gray-800">Canvas Menu</h2>
               <p className="text-sm text-gray-600">Quick actions</p>
