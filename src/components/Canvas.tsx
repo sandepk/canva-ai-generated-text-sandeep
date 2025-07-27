@@ -31,6 +31,7 @@ const Canvas: React.FC = () => {
     }
   });
   const [minSize, setMinSize] = useState({ width: 0, height: 0 });
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
 
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(
@@ -76,9 +77,9 @@ const Canvas: React.FC = () => {
 
   const createNodeWithText = useCallback(
     (text: string) => {
-      // Create node at center of viewport
+      // Create node at center of viewport (adjusted for mobile)
       const centerX = window.innerWidth / 2 - 100;
-      const centerY = window.innerHeight / 2 - 25;
+      const centerY = (window.innerHeight / 2) - 25 + (isMobile ? 50 : 0); // Offset for mobile
       
       // Calculate text dimensions to auto-size the node
       const canvas = document.createElement('canvas');
@@ -89,11 +90,11 @@ const Canvas: React.FC = () => {
         const textWidth = textMetrics.width;
         const textHeight = 20; // Approximate line height
         
-        // Calculate node dimensions with padding
+        // Calculate node dimensions with padding (adjusted for mobile)
         const padding = 20;
-        const minWidth = 200;
+        const minWidth = isMobile ? 180 : 200; // Slightly smaller on mobile
         const minHeight = 50;
-        const maxWidth = Math.min(window.innerWidth - 100, 600); // Max width with margin
+        const maxWidth = Math.min(window.innerWidth - (isMobile ? 40 : 100), isMobile ? 500 : 600); // Adjusted for mobile
         
         const nodeWidth = Math.max(minWidth, Math.min(textWidth + padding * 2, maxWidth));
         const nodeHeight = Math.max(minHeight, textHeight + padding * 2);
@@ -377,13 +378,16 @@ const Canvas: React.FC = () => {
     const target = e.target as HTMLElement;
     if (target.closest('[data-node]')) return; // Don't show context menu on nodes
     
-    const touch = e.touches[0];
-    const timeoutId = setTimeout(() => {
-      setShowContextSidebar(true);
-    }, 500); // 500ms long press
-    
-    // Store timeout ID to clear it if touch ends before timeout
-    (e.currentTarget as any)._contextMenuTimeout = timeoutId;
+    // Only handle single touch for context menu, allow multi-touch for scrolling
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const timeoutId = setTimeout(() => {
+        setShowContextSidebar(true);
+      }, 500); // 500ms long press
+      
+      // Store timeout ID to clear it if touch ends before timeout
+      (e.currentTarget as any)._contextMenuTimeout = timeoutId;
+    }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
@@ -395,6 +399,11 @@ const Canvas: React.FC = () => {
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    // Allow multi-touch scrolling to work normally
+    if (e.touches.length > 1) {
+      return; // Don't interfere with multi-touch gestures
+    }
+    
     const timeoutId = (e.currentTarget as any)._contextMenuTimeout;
     if (timeoutId) {
       clearTimeout(timeoutId);
@@ -525,30 +534,67 @@ const Canvas: React.FC = () => {
       tempContainer.style.backgroundSize = "20px 20px";
       tempContainer.style.backgroundColor = '#f9fafb';
       tempContainer.style.overflow = 'hidden';
+      tempContainer.style.zIndex = '0';
       
-      // Clone all nodes and position them relative to the new container
-      nodes.forEach(node => {
-        const nodeElement = document.createElement('div');
-        nodeElement.style.position = 'absolute';
-        nodeElement.style.left = `${node.x - minX + padding}px`;
-        nodeElement.style.top = `${node.y - minY + padding}px`;
-        nodeElement.style.width = `${node.width}px`;
-        nodeElement.style.height = `${node.height}px`;
-        nodeElement.style.backgroundColor = node.color;
-        nodeElement.style.borderRadius = '8px';
-        nodeElement.style.padding = '12px';
-        nodeElement.style.fontSize = '14px';
-        nodeElement.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-        nodeElement.style.color = '#1f2937';
-        nodeElement.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-        nodeElement.style.border = '1px solid rgba(0, 0, 0, 0.1)';
-        nodeElement.style.whiteSpace = 'pre-wrap';
-        nodeElement.style.wordBreak = 'break-word';
-        nodeElement.style.overflow = 'hidden';
-        nodeElement.textContent = node.text;
+      // Clone the actual rendered nodes from the UI to preserve exact styling
+      const actualCanvas = canvasRef.current;
+      const actualNodes = actualCanvas.querySelectorAll('[data-node-id]');
+      
+      actualNodes.forEach((actualNode) => {
+        const nodeId = actualNode.getAttribute('data-node-id');
+        const node = nodes.find(n => n.id === nodeId);
         
-        tempContainer.appendChild(nodeElement);
+        if (node) {
+          // Clone the actual rendered node to preserve exact styling
+          const clonedNode = actualNode.cloneNode(true) as HTMLElement;
+          
+          // Position the cloned node in the export container
+          clonedNode.style.position = 'absolute';
+          clonedNode.style.left = `${node.x - minX + padding}px`;
+          clonedNode.style.top = `${node.y - minY + padding}px`;
+          clonedNode.style.transform = 'none'; // Remove any transforms
+          clonedNode.style.zIndex = '1';
+          
+          // Ensure the node is visible and properly styled
+          clonedNode.style.display = 'block';
+          clonedNode.style.visibility = 'visible';
+          clonedNode.style.opacity = '1';
+          
+          // Remove any interactive elements that shouldn't be in the export
+          const actionButtons = clonedNode.querySelectorAll('.node-actions, [data-action]');
+          actionButtons.forEach(btn => btn.remove());
+          
+          tempContainer.appendChild(clonedNode);
+        }
       });
+      
+      // If no actual nodes found, fall back to creating them from data
+      if (tempContainer.children.length === 0) {
+        nodes.forEach(node => {
+          const nodeElement = document.createElement('div');
+          nodeElement.style.position = 'absolute';
+          nodeElement.style.left = `${node.x - minX + padding}px`;
+          nodeElement.style.top = `${node.y - minY + padding}px`;
+          nodeElement.style.width = `${node.width}px`;
+          nodeElement.style.height = `${node.height}px`;
+          nodeElement.style.backgroundColor = node.color;
+          nodeElement.style.borderRadius = '8px';
+          nodeElement.style.padding = '12px';
+          nodeElement.style.fontSize = '14px';
+          nodeElement.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+          nodeElement.style.color = '#1f2937';
+          nodeElement.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+          nodeElement.style.border = '1px solid rgba(0, 0, 0, 0.1)';
+          nodeElement.style.whiteSpace = 'pre-wrap';
+          nodeElement.style.wordBreak = 'break-word';
+          nodeElement.style.overflow = 'hidden';
+          nodeElement.style.display = 'block';
+          nodeElement.style.zIndex = '1';
+          nodeElement.textContent = node.text;
+          
+          tempContainer.appendChild(nodeElement);
+        });
+      }
       
       document.body.appendChild(tempContainer);
       
@@ -559,7 +605,11 @@ const Canvas: React.FC = () => {
         scale: 2, // Higher resolution
         useCORS: true,
         allowTaint: true,
-        backgroundColor: '#f9fafb'
+        backgroundColor: '#f9fafb',
+        logging: false,
+        removeContainer: false,
+        foreignObjectRendering: false,
+        imageTimeout: 0
       });
       
       // Clean up
@@ -582,18 +632,50 @@ const Canvas: React.FC = () => {
   }, [nodes.length]);
   useEffect(() => {
     const updateSize = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      setMinSize({ width, height });
+      // Calculate the bounds of all nodes to determine canvas size
+      let canvasWidth = window.innerWidth;
+      let canvasHeight = window.innerHeight;
+      
+      if (nodes.length > 0) {
+        const minX = Math.min(...nodes.map(node => node.x));
+        const minY = Math.min(...nodes.map(node => node.y));
+        const maxX = Math.max(...nodes.map(node => node.x + node.width));
+        const maxY = Math.max(...nodes.map(node => node.y + node.height));
+        
+        // Add padding around nodes (increased viewport area for mobile)
+        const padding = window.innerWidth < 768 ? 400 : 200;
+        canvasWidth = Math.max(canvasWidth, maxX - minX + padding * 2);
+        canvasHeight = Math.max(canvasHeight, maxY - minY + padding * 2);
+      }
+      
+      setMinSize({ width: canvasWidth, height: canvasHeight });
     };
 
     updateSize(); // Initial call
     window.addEventListener("resize", updateSize);
-    return () => window.removeEventListener("resize", updateSize);
+    window.addEventListener("orientationchange", updateSize);
+    return () => {
+      window.removeEventListener("resize", updateSize);
+      window.removeEventListener("orientationchange", updateSize);
+    };
+  }, [nodes]);
+
+  // Track mobile/desktop state
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
+    };
   }, []);
 
   return (
-    <div className="relative w-full h-screen bg-gray-50 overflow-hidden">
+    <div className="relative w-full h-screen bg-gray-50">
       <Toolbar
         onAddNode={() => createNode(100, 100)}
         onToggleAI={() => setShowAIAssistant(!showAIAssistant)}
@@ -601,11 +683,30 @@ const Canvas: React.FC = () => {
         onExportJSON={exportToJSON}
         onExportImage={exportToImage}
         toggleList={() => setShowNodeList(!showNodeList)}
+        showNodeList={showNodeList}
       />
 
       <div
         ref={scrollContainerRef}
-        className="w-full h-screen overflow-hidden"
+        className="w-full h-full overflow-auto canvas-scroll"
+        style={{ 
+          height: isMobile ? 'calc(100vh - 90px)' : 'calc(100vh - 40px)', // Increased height for mobile
+          paddingTop: isMobile ? '90px' : '80px', // Reduced padding for mobile to increase viewport
+          minHeight: isMobile ? 'calc(100vh - 90px)' : 'calc(100vh - 40px)',
+          WebkitOverflowScrolling: 'touch',
+          overflowX: 'auto',
+          overflowY: 'auto'
+        }}
+        onWheel={(e) => {
+          // Ensure wheel events work for scrolling
+          e.stopPropagation();
+        }}
+        onTouchStart={(e) => {
+          // Allow touch events to propagate for scrolling
+          if (e.touches.length > 1) {
+            e.stopPropagation();
+          }
+        }}
       >
         <div
           ref={canvasRef}
@@ -614,11 +715,16 @@ const Canvas: React.FC = () => {
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           onTouchMove={handleTouchMove}
-          className="relative w-full h-full cursor-crosshair"
+          className="relative cursor-crosshair"
           style={{
+            width: minSize.width,
+            height: minSize.height,
+            minHeight: isMobile ? '150vh' : '100vh', // Increased minimum height for mobile
             backgroundImage:
               "radial-gradient(circle, #e5e7eb 1px, transparent 1px)",
             backgroundSize: "20px 20px",
+            // Ensure canvas doesn't interfere with scrolling
+            pointerEvents: 'auto',
           }}
         >
           {nodes.map((node) => (

@@ -8,6 +8,7 @@ interface ToolbarActionsProps {
   onExportJSON: () => void;
   onExportImage: () => void;
   toggleList: () => void;
+  showNodeList: boolean;
   className?: string;
   "aria-label"?: string;
 }
@@ -19,6 +20,7 @@ const ToolbarActions: React.FC<ToolbarActionsProps> = ({
   onExportJSON,
   onExportImage,
   toggleList,
+  showNodeList,
   className = "",
   "aria-label": ariaLabel,
 }) => (
@@ -71,11 +73,11 @@ const ToolbarActions: React.FC<ToolbarActionsProps> = ({
     <button
       onClick={toggleList}
       className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 text-gray-700 hover:bg-red-50 hover:text-red-700 rounded-md transition-all duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
-      title="List Nodes"
-      aria-label="Toggle node list visibility"
+      title={showNodeList ? "Hide Node List" : "Show Node List"}
+      aria-label={`${showNodeList ? 'Hide' : 'Show'} node list`}
     >
       <ListIcon className="w-4 h-4" aria-hidden="true" />
-      <span className="hidden sm:inline">List Node</span>
+      <span className="hidden sm:inline">{showNodeList ? "Hide Node List" : "Show Node List"}</span>
     </button>
   </div>
 );

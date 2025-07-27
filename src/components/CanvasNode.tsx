@@ -218,6 +218,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
     <div
       ref={nodeRef}
       data-node="true"
+      data-node-id={node.id}
       className={`absolute select-none touch-none group transition-all duration-300 ease-out ${
         isDragging ? "scale-105 z-50" : "hover:scale-105"
       } ${highlighted ? "ring-4 ring-green-400 animate-pulse" : ""} ${

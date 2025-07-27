@@ -151,7 +151,7 @@ const ContextSidebar: React.FC<ContextSidebarProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 sm:hidden">
+    <div className="fixed inset-0 z-[10000] sm:hidden">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/20 backdrop-blur-sm"
@@ -259,7 +259,7 @@ const ContextSidebar: React.FC<ContextSidebarProps> = ({
               <ListIcon className="w-5 h-5" />
             </div>
             <div className="text-left">
-              <div className="font-semibold">Node List</div>
+              <div className="font-semibold">{showNodeList ? "Hide Node List" : "Show Node List"}</div>
               <div className={`text-sm ${showNodeList ? "text-green-100" : "text-gray-500"}`}>
                 {showNodeList ? "Currently visible" : "View all nodes"}
               </div>

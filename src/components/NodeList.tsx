@@ -24,10 +24,27 @@ const NodeList: React.FC<NodeListProps> = ({
   onClose,
 }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  
+  // Enhanced touch handling for mobile scrolling
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Don't prevent default - allow natural scrolling
+    e.stopPropagation();
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent) => {
+    // Don't prevent default - allow natural scrolling
+    e.stopPropagation();
+  };
+  
+  const handleScroll = (e: React.UIEvent) => {
+    // Ensure scroll events work properly
+    e.stopPropagation();
+  };
   return (
     <div className="absolute z-40 bg-white shadow-lg rounded-lg w-64 sm:w-72 sm:top-28 sm:right-4 top-auto bottom-8 sm:bottom-6 right-2 max-h-[45vh] sm:h-[65vh] overflow-hidden flex flex-col" style={{ 
       bottom: window.innerWidth < 768 ? 'calc(2rem + env(safe-area-inset-bottom, 0px))' : undefined,
-      maxHeight: window.innerWidth < 768 ? 'calc(45vh - env(safe-area-inset-bottom, 0px))' : undefined
+      maxHeight: window.innerWidth < 768 ? 'calc(45vh - env(safe-area-inset-bottom, 0px))' : undefined,
+      height: window.innerWidth < 768 ? 'calc(45vh - env(safe-area-inset-bottom, 0px))' : undefined
     }}>
       {/* Fixed Header */}
       <div className="bg-blue-50 rounded-t-lg px-4 py-2 border-b border-gray-200 flex-shrink-0">
@@ -87,11 +104,22 @@ const NodeList: React.FC<NodeListProps> = ({
         )}
       </div>
       {/* Scrollable Content */}
-      <div className="overflow-y-auto overscroll-contain mobile-scroll flex-1" style={{ 
-        maxHeight: window.innerWidth < 768 ? 'calc(100% - 90px)' : 'calc(100% - 80px)',
-        minHeight: 0
-      }}>
-        <div className="p-4 pb-6">
+      <div 
+        className="overflow-y-auto overscroll-contain mobile-scroll flex-1" 
+        style={{ 
+          maxHeight: window.innerWidth < 768 ? 'calc(100% - 90px)' : 'calc(100% - 80px)',
+          minHeight: 0,
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'contain',
+          overflowY: 'auto',
+          overflowX: 'hidden'
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onScroll={handleScroll}
+      >
+        <div className="p-4 pb-6" style={{ minHeight: '100%' }}>
           <ul className="space-y-1">
         {nodes.map((node, index) => (
           <li

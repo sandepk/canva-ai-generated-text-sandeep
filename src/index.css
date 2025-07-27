@@ -2,13 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Remove default scroll behavior */
+/* Enable scrolling for canvas content */
 html, body {
-  overflow: hidden;
+  overflow: auto;
   margin: 0;
   padding: 0;
   height: 100vh;
   width: 100vw;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Prevent scroll on all elements by default */
@@ -27,21 +28,36 @@ html, body {
   /* iOS Safari */
   html, body {
     height: -webkit-fill-available;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* iOS Safari canvas scrolling */
+  .canvas-scroll {
+    -webkit-overflow-scrolling: touch !important;
+    height: -webkit-fill-available !important;
+  }
+  
+  /* iOS Safari NodeList scrolling */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch !important;
+    height: -webkit-fill-available !important;
   }
 }
 
-/* Prevent mobile browser address bar from affecting layout */
+/* Enable scrolling on mobile */
 @media screen and (max-width: 768px) {
   html {
     height: 100%;
-    overflow: hidden;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
   }
   
   body {
     height: 100%;
-    overflow: hidden;
-    position: fixed;
+    overflow: auto;
+    position: relative;
     width: 100%;
+    -webkit-overflow-scrolling: touch;
   }
   
   /* iOS Safari specific fixes */
@@ -54,6 +70,32 @@ html, body {
   .fixed {
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
+  }
+  
+  /* Ensure toolbar logo is always visible on mobile */
+  @media screen and (max-width: 768px) {
+    /* Force toolbar to stay visible but below context sidebar */
+    .fixed[role="toolbar"] {
+      z-index: 50 !important;
+      position: fixed !important;
+      top: 0 !important;
+      left: 0.5rem !important;
+      right: auto !important;
+      bottom: auto !important;
+      /* Ensure it's above other elements but below context sidebar */
+      transform: translateZ(0) !important;
+      -webkit-transform: translateZ(0) !important;
+    }
+    
+    /* Ensure logo link is always visible */
+    .fixed[role="toolbar"] a[href*="statisfy.com"] {
+      z-index: 51 !important;
+      position: relative !important;
+      min-width: fit-content !important;
+      display: flex !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
   }
   
   /* Mobile scrolling fixes */
@@ -82,19 +124,193 @@ html, body {
     touch-action: pan-y !important;
     overscroll-behavior: contain !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    height: 100% !important;
+    min-height: 0 !important;
   }
   
-  /* Prevent NodeList overflow on mobile */
+  .mobile-scroll::-webkit-scrollbar {
+    display: none !important;
+  }
+  
+  /* Enhanced NodeList mobile scrolling */
   @media screen and (max-width: 768px) {
     .mobile-scroll {
-      max-height: calc(45vh - env(safe-area-inset-bottom, 0px)) !important;
+      -webkit-overflow-scrolling: touch !important;
+      touch-action: pan-y !important;
+      overscroll-behavior: contain !important;
       overflow-y: auto !important;
       overflow-x: hidden !important;
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      /* Force momentum scrolling on iOS */
+      -webkit-overflow-scrolling: touch !important;
+    }
+    
+    .mobile-scroll::-webkit-scrollbar {
+      display: none !important;
+    }
+    
+    /* Force NodeList touch scrolling */
+    .mobile-scroll * {
+      -webkit-overflow-scrolling: touch !important;
+      touch-action: pan-y !important;
+    }
+    
+    /* Ensure NodeList container allows scrolling */
+    .mobile-scroll {
+      /* Prevent scroll chaining */
+      overscroll-behavior: contain !important;
+      /* Enable momentum scrolling */
+      -webkit-overflow-scrolling: touch !important;
+      /* Ensure proper height */
+      height: 100% !important;
+      min-height: 0 !important;
     }
   }
   
   /* Ensure NodeList container properly contains content */
   .overflow-hidden {
     overflow: hidden !important;
+  }
+  
+  /* Force NodeList touch scrolling for all mobile devices */
+  @supports (-webkit-touch-callout: none) {
+    .mobile-scroll {
+      -webkit-overflow-scrolling: touch !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      overflow-y: auto !important;
+      touch-action: pan-y !important;
+    }
+  }
+  
+  /* Additional mobile scrolling fixes */
+  @media screen and (max-width: 768px) {
+    /* Force all scrollable elements to work on mobile */
+    .overflow-y-auto {
+      -webkit-overflow-scrolling: touch !important;
+      touch-action: pan-y !important;
+      overscroll-behavior: contain !important;
+    }
+    
+    /* Specific NodeList fixes */
+    .mobile-scroll {
+      /* Ensure proper flex behavior */
+      flex: 1 1 auto !important;
+      /* Force scrolling */
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
+      /* iOS momentum scrolling */
+      -webkit-overflow-scrolling: touch !important;
+      /* Prevent scroll chaining */
+      overscroll-behavior: contain !important;
+      /* Touch actions */
+      touch-action: pan-y !important;
+      /* Hide scrollbars */
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
+    }
+    
+    .mobile-scroll::-webkit-scrollbar {
+      display: none !important;
+    }
+  }
+  
+  /* Canvas scrolling styles */
+  .canvas-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    touch-action: pan-x pan-y;
+    /* Enable trackpad scrolling */
+    overflow: auto;
+    /* Ensure scrolling works on all devices */
+    scroll-behavior: smooth;
+  }
+  
+  .canvas-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .canvas-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .canvas-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+  
+  .canvas-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Mobile-specific canvas scrolling */
+  @media screen and (max-width: 768px) {
+    .canvas-scroll {
+      -webkit-overflow-scrolling: touch !important;
+      touch-action: pan-x pan-y !important;
+      overscroll-behavior: contain !important;
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
+      overflow-y: auto !important;
+      overflow-x: auto !important;
+      scroll-behavior: smooth !important;
+    }
+    
+    .canvas-scroll::-webkit-scrollbar {
+      display: none !important;
+    }
+    
+    /* Force mobile scrolling to work */
+    .canvas-scroll * {
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Ensure mobile touch scrolling */
+    .canvas-scroll {
+      /* Prevent scroll chaining */
+      overscroll-behavior: contain;
+      /* Enable momentum scrolling */
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+  
+  /* Desktop trackpad scrolling */
+  @media screen and (min-width: 769px) {
+    .canvas-scroll {
+      /* Enable smooth trackpad scrolling on desktop */
+      scroll-behavior: smooth;
+      /* Allow all touch actions for trackpad */
+      touch-action: manipulation;
+      /* Ensure proper scrolling */
+      overflow-x: auto;
+      overflow-y: auto;
+    }
+    
+    .canvas-scroll::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    .canvas-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .canvas-scroll::-webkit-scrollbar-thumb {
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+    
+    .canvas-scroll::-webkit-scrollbar-thumb:hover {
+      background-color: rgba(0, 0, 0, 0.3);
+    }
   }
 }
