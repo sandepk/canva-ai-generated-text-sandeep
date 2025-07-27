@@ -1,23 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import html2canvas from "html2canvas";
 import { Node, DragState } from "../types";
 import CanvasNode from "./CanvasNode";
 import AIAssistant from "./AIAssistant";
 import Toolbar from "./Toolbar";
-import ToolbarActions from "./ToolbarActions";
 import { generateText } from "../services/api";
-import {
-  Plus,
-  Bot,
-  Layout,
-  FileDown,
-  Image as ImageIcon,
-  ListIcon,
-  RotateCcw, // Undo
-  RotateCw, // Redo
-} from "lucide-react";
+import { Plus, RotateCcw, RotateCw, Bot, FileDown, Image as ImageIcon, ListIcon } from "lucide-react";
 import NodeList from "./NodeList";
-import { createPortal } from 'react-dom';
 
 const COLORS = [
   "#3B82F6", // blue
@@ -70,9 +60,6 @@ const Canvas: React.FC = () => {
     null,
   );
   const [showNodeList, setShowNodeList] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; visible: boolean }>(
-    { x: 0, y: 0, visible: false }
-  );
 
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
@@ -81,140 +68,224 @@ const Canvas: React.FC = () => {
   });
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+  }>({ visible: false, x: 0, y: 0 });
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
   const createNode = useCallback(
-    (x: number, y: number, text: string = "New Node", color?: string, emoji?: string) => {
-      setNodes(prev => {
-        pushToUndoStack(prev);
-        let displayText = text;
-        if (emoji) displayText = emoji + " " + text;
-        const newNode: Node = {
-          id: generateId(),
-          x,
-          y,
-          text: displayText,
-          color: color || COLORS[Math.floor(Math.random() * COLORS.length)],
-          width: 200,
-          height: 50,
-        };
-        return [...prev, newNode];
-      });
+    (x: number, y: number, text: string = "") => {
+      pushToUndoStack([...nodes]); // capture before change
+      const newNode: Node = {
+        id: generateId(),
+        x,
+        y,
+        text,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+        width: 200,
+        height: 50,
+        isEditing: true,
+      };
+      setNodes((prev) => [...prev, newNode]);
+      return newNode.id;
     },
-    [pushToUndoStack],
+    [nodes, pushToUndoStack]
   );
+  
 
   const updateNode = useCallback(
     (id: string, updates: Partial<Node>) => {
-      pushToUndoStack(nodes);
-      setNodes((prev) =>
-        prev.map((node) => (node.id === id ? { ...node, ...updates } : node)),
-      );
+      setNodes((prev) => {
+        pushToUndoStack([...prev]); // ✅ capture before mutation
+        return prev.map((node) => (node.id === id ? { ...node, ...updates } : node));
+      });
     },
-    [nodes, pushToUndoStack],
+    [pushToUndoStack]
   );
+  
 
   const deleteNode = useCallback(
     (id: string) => {
-      pushToUndoStack(nodes);
+      pushToUndoStack([...nodes]); // capture before deletion
       setNodes((prev) => prev.filter((node) => node.id !== id));
     },
-    [nodes, pushToUndoStack],
+    [nodes, pushToUndoStack]
   );
+  
+  
 
-  const handleStartDrag = (
-    e: React.MouseEvent | React.TouchEvent,
-    nodeId: string,
-  ) => {
-    e.preventDefault();
-    const node = nodes.find((n) => n.id === nodeId);
-    if (!node || !canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const clientX =
-      "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY =
-      "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-    const offsetX = clientX - rect.left - node.x;
-    const offsetY = clientY - rect.top - node.y;
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    if (e.target === canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left - 100;
+      const y = e.clientY - rect.top - 50;
+      createNode(x, y);
+    }
+  };
 
+  const handleStartDrag = (e: React.MouseEvent | React.TouchEvent, nodeId: string) => {
+    const target = e.target as HTMLDivElement;
+    const rect = target.getBoundingClientRect();
+    
+    // Handle both mouse and touch events
+    let clientX: number, clientY: number;
+    if ('touches' in e) {
+      // Touch event
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      // Mouse event
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    const offsetX = clientX - rect.left;
+    const offsetY = clientY - rect.top;
+  
     setDragState({
       isDragging: true,
       dragOffset: { x: offsetX, y: offsetY },
       nodeId,
     });
+  
+    pushToUndoStack([...nodes]); // snapshot before drag
 
-    const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
-      if (!canvasRef.current) return;
-      const moveX =
-        moveEvent instanceof TouchEvent
-          ? moveEvent.touches[0].clientX
-          : (moveEvent as MouseEvent).clientX;
-      const moveY =
-        moveEvent instanceof TouchEvent
-          ? moveEvent.touches[0].clientY
-          : (moveEvent as MouseEvent).clientY;
-      const x = moveX - rect.left - offsetX;
-      const y = moveY - rect.top - offsetY;
-      updateNode(nodeId, { x, y });
+    // Add global event listeners for drag move and end
+    const handleDragMove = (moveEvent: MouseEvent | TouchEvent) => {
+      let moveX: number, moveY: number;
+      if (moveEvent instanceof TouchEvent) {
+        moveX = moveEvent.touches[0].clientX;
+        moveY = moveEvent.touches[0].clientY;
+      } else {
+        moveX = moveEvent.clientX;
+        moveY = moveEvent.clientY;
+      }
+
+      const canvasRect = canvasRef.current?.getBoundingClientRect();
+      const scrollContainer = scrollContainerRef.current;
+      
+      if (canvasRect && scrollContainer) {
+        const newX = moveX - canvasRect.left + scrollContainer.scrollLeft - offsetX;
+        const newY = moveY - canvasRect.top + scrollContainer.scrollTop - offsetY;
+        
+        updateNode(nodeId, { x: newX, y: newY });
+      }
     };
 
-    const handleEnd = () => {
-      setDragState({
-        isDragging: false,
-        dragOffset: { x: 0, y: 0 },
-        nodeId: null,
-      });
-      document.removeEventListener("mousemove", handleMove);
-      document.removeEventListener("mouseup", handleEnd);
-      document.removeEventListener("touchmove", handleMove);
-      document.removeEventListener("touchend", handleEnd);
+    const handleDragEnd = () => {
+      setDragState(prev => ({ ...prev, isDragging: false, nodeId: null }));
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+      document.removeEventListener('touchmove', handleDragMove);
+      document.removeEventListener('touchend', handleDragEnd);
     };
 
-    document.addEventListener("mousemove", handleMove);
-    document.addEventListener("mouseup", handleEnd);
-    document.addEventListener("touchmove", handleMove);
-    document.addEventListener("touchend", handleEnd);
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
+    document.addEventListener('touchmove', handleDragMove);
+    document.addEventListener('touchend', handleDragEnd);
   };
+  
 
   const handleNodeEdit = (nodeId: string) =>
     updateNode(nodeId, { isEditing: true });
-  const handleNodeSave = (nodeId: string, text: string) =>
-    updateNode(nodeId, { text, isEditing: false });
+  const handleNodeSave = (nodeId: string, text: string) => {
+    // If text is empty or only whitespace, delete the node
+    if (!text || text.trim() === '') {
+      deleteNode(nodeId);
+    } else {
+      updateNode(nodeId, { text: text.trim(), isEditing: false });
+    }
+  };
+
+  // Context menu handlers
+  const calculateContextMenuPosition = (x: number, y: number) => {
+    const menuWidth = 180;
+    const menuHeight = 280; // Approximate height
+    const margin = 10;
+    
+    let adjustedX = x;
+    let adjustedY = y;
+    
+    // Ensure menu doesn't go off the right edge
+    if (x + menuWidth > window.innerWidth - margin) {
+      adjustedX = window.innerWidth - menuWidth - margin;
+    }
+    
+    // Ensure menu doesn't go off the bottom edge
+    if (y + menuHeight > window.innerHeight - margin) {
+      adjustedY = window.innerHeight - menuHeight - margin;
+    }
+    
+    // Ensure menu doesn't go off the left edge
+    if (x < margin) {
+      adjustedX = margin;
+    }
+    
+    // Ensure menu doesn't go off the top edge
+    if (y < margin) {
+      adjustedY = margin;
+    }
+    
+    return { x: adjustedX, y: adjustedY };
+  };
+
+  const handleCanvasContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (dragState.isDragging) return;
+    const position = calculateContextMenuPosition(e.clientX, e.clientY);
+    setContextMenu({ x: position.x, y: position.y, visible: true });
+  };
+
+  // Mobile touch handlers for context menu
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (dragState.isDragging) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-node]')) return; // Don't show context menu on nodes
+    
+    const touch = e.touches[0];
+    const timeoutId = setTimeout(() => {
+      const position = calculateContextMenuPosition(touch.clientX, touch.clientY);
+      setContextMenu({ x: position.x, y: position.y, visible: true });
+    }, 500); // 500ms long press
+    
+    // Store timeout ID to clear it if touch ends before timeout
+    (e.currentTarget as any)._contextMenuTimeout = timeoutId;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const timeoutId = (e.currentTarget as any)._contextMenuTimeout;
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      (e.currentTarget as any)._contextMenuTimeout = null;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const timeoutId = (e.currentTarget as any)._contextMenuTimeout;
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      (e.currentTarget as any)._contextMenuTimeout = null;
+    }
+  };
 
   const handleAIRequest = (prompt: string, nodeId?: string) =>
     new Promise<void>(async (resolve, reject) => {
       try {
         const aiResponse = await generateText(prompt);
-        let text = aiResponse;
-        let color: string | undefined = undefined;
-        let emoji: string | undefined = '🪄'; // Default emoji
-        // Try to parse as JSON for structured styling
-        try {
-          const parsed = JSON.parse(aiResponse);
-          if (typeof parsed === 'object' && parsed !== null) {
-            text = parsed.text || text;
-            color = parsed.color;
-            if (parsed.emoji !== undefined) {
-              emoji = parsed.emoji;
-            }
-          }
-        } catch {}
-        if (nodeId) {
-          let displayText = text;
-          if (emoji) displayText = emoji + " " + text;
-          updateNode(nodeId, { text: displayText, color: color });
-        } else {
+        if (nodeId) updateNode(nodeId, { text: aiResponse });
+        else {
           const rect = canvasRef.current?.getBoundingClientRect();
           if (rect)
             createNode(
               Math.random() * (rect.width - 200),
               Math.random() * (rect.height - 100),
-              text,
-              color,
-              emoji,
+              aiResponse,
             );
         }
         resolve();
@@ -254,6 +325,25 @@ const Canvas: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undoStack, redoStack, nodes]);
+
+  useEffect(() => {
+    if (!contextMenu.visible) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setContextMenu((cm) => ({ ...cm, visible: false }));
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.context-menu')) {
+        setContextMenu((cm) => ({ ...cm, visible: false }));
+      }
+    };
+    window.addEventListener("keydown", handleEsc);
+    window.addEventListener("click", handleClickOutside);
+    return () => {
+      window.removeEventListener("keydown", handleEsc);
+      window.removeEventListener("click", handleClickOutside);
+    };
+  }, [contextMenu.visible]);
   const exportToJSON = () => {
     const json = JSON.stringify(nodes, null, 2);
     const blob = new Blob([json], { type: "application/json" });
@@ -302,40 +392,8 @@ const Canvas: React.FC = () => {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  useEffect(() => {
-    if (!contextMenu.visible) return;
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setContextMenu((cm) => ({ ...cm, visible: false }));
-    };
-    window.addEventListener("keydown", handleEsc);
-    return () => window.removeEventListener("keydown", handleEsc);
-  }, [contextMenu.visible]);
-
-  // Context menu handlers
-  const handleCanvasContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, visible: true });
-  };
-
-  
-
   return (
     <div className="relative w-full h-screen bg-gray-50 overflow-hidden">
-      {/* Mobile Sidebar ToolbarActions */}
-      <div className="fixed bottom-0 left-0 w-full z-50 bg-white border-t border-gray-200 sm:hidden flex justify-around p-2 shadow-lg">
-        <ToolbarActions
-          onAddNode={() => createNode(100, 100)}
-          onToggleAI={() => setShowAIAssistant(!showAIAssistant)}
-          showAI={showAIAssistant}
-          onExportJSON={exportToJSON}
-          onExportImage={exportToImage}
-          toggleList={() => setShowNodeList(!showNodeList)}
-          onUndo={undo}
-          onRedo={redo}
-          className="flex w-full justify-around"
-        />
-      </div>
-      {/* Toolbar always visible */}
       <Toolbar
         onAddNode={() => createNode(100, 100)}
         onToggleAI={() => setShowAIAssistant(!showAIAssistant)}
@@ -353,6 +411,11 @@ const Canvas: React.FC = () => {
       >
         <div
           ref={canvasRef}
+          onClick={handleCanvasClick}
+          onContextMenu={handleCanvasContextMenu}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onTouchMove={handleTouchMove}
           className={`relative ${nodes.length === 0 ? "w-full h-full" : ""} cursor-crosshair`}
           style={{
             backgroundImage:
@@ -361,7 +424,6 @@ const Canvas: React.FC = () => {
             minWidth: nodes.length > 0 ? `${minSize.width}px` : undefined,
             minHeight: nodes.length > 0 ? `${minSize.height}px` : undefined,
           }}
-          onContextMenu={handleCanvasContextMenu}
         >
           {nodes.map((node) => (
             <CanvasNode
@@ -381,117 +443,12 @@ const Canvas: React.FC = () => {
             />
           ))}
 
-          {/* Context Menu */}
-          {contextMenu.visible && createPortal(
-            <div
-              className="fixed z-50 bg-white border border-gray-300 rounded shadow-lg py-1 px-2 min-w-[180px] pointer-events-auto"
-              style={{ left: contextMenu.x, top: contextMenu.y }}
-            >
-              <button
-                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-blue-50 rounded text-gray-800"
-                onClick={() => {
-                  console.log('Add Node Here clicked');
-                  const canvasRect = canvasRef.current?.getBoundingClientRect();
-                  const scrollContainer = scrollContainerRef.current;
-                  let x = 100, y = 100;
-                  if (canvasRect && scrollContainer) {
-                    x = contextMenu.x - canvasRect.left + scrollContainer.scrollLeft;
-                    y = contextMenu.y - canvasRect.top + scrollContainer.scrollTop;
-                  }
-                  createNode(x, y);
-                  setContextMenu((cm) => ({ ...cm, visible: false }));
-                }}
-              >
-                <Plus className="w-4 h-4" /> Add Node Here
-              </button>
-              <button
-                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-gray-100 rounded text-gray-800"
-                onClick={() => {
-                  undo();
-                  setContextMenu((cm) => ({ ...cm, visible: false }));
-                }}
-              >
-                <RotateCcw className="w-4 h-4" /> Undo
-              </button>
-              <button
-                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-gray-100 rounded text-gray-800"
-                onClick={() => {
-                  redo();
-                  setContextMenu((cm) => ({ ...cm, visible: false }));
-                }}
-              >
-                <RotateCw className="w-4 h-4" /> Redo
-              </button>
-              <button
-                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-purple-50 rounded text-gray-800"
-                onClick={() => {
-                  setShowAIAssistant((show) => !show);
-                  setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 100);
-                }}
-              >
-                <Bot className="w-4 h-4" /> Toggle AI Assistant
-              </button>
-              <button
-                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-green-50 rounded text-gray-800"
-                onClick={() => {
-                  exportToJSON();
-                  setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 200);
-                }}
-              >
-                <FileDown className="w-4 h-4" /> Export JSON
-              </button>
-              <button
-                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-yellow-50 rounded text-gray-800"
-                onClick={() => {
-                  exportToImage();
-                  setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 200);
-                }}
-              >
-                <ImageIcon className="w-4 h-4" /> Export Image
-              </button>
-              <button
-                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-red-50 rounded text-gray-800"
-                onClick={() => {
-                  setShowNodeList((show) => !show);
-                  setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 100);
-                }}
-              >
-                <ListIcon className="w-4 h-4" /> List Nodes
-              </button>
-              <button
-                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-gray-200 rounded text-gray-600 mt-2 border-t border-gray-200"
-                onClick={() => setContextMenu((cm) => ({ ...cm, visible: false }))}
-              >
-                Cancel
-              </button>
-            </div>,
-            document.body
-          )}
-
           {nodes.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="text-center text-gray-400">
-                <button
-                  className="w-12 h-12 mx-auto mb-4 flex items-center justify-center bg-white rounded-full shadow hover:bg-blue-100 transition pointer-events-auto"
-                  onClick={() => {
-                    // Center node in viewport
-                    const scrollContainer = scrollContainerRef.current;
-                    const canvas = canvasRef.current;
-                    let x = 100, y = 100;
-                    if (scrollContainer && canvas) {
-                      const viewWidth = scrollContainer.clientWidth;
-                      const viewHeight = scrollContainer.clientHeight;
-                      x = Math.max(0, (viewWidth - 200) / 2 + scrollContainer.scrollLeft);
-                      y = Math.max(0, (viewHeight - 50) / 2 + scrollContainer.scrollTop);
-                    }
-                    createNode(x, y);
-                  }}
-                  title="Add node"
-                >
-                  <Plus className="w-12 h-12 text-blue-500" />
-                </button>
+                <Plus className="w-12 h-12 mx-auto mb-4" />
                 <p className="text-lg font-medium">
-                  Click the plus to add a node
+                  Click anywhere to add a node
                 </p>
                 <p className="text-sm">Or use the toolbar to get started</p>
               </div>
@@ -533,8 +490,106 @@ const Canvas: React.FC = () => {
             setHighlightedNodeId(id);
             setTimeout(() => setHighlightedNodeId(null), 2000);
           }}
+          onRemoveAll={() => {
+            pushToUndoStack([...nodes]);
+            setNodes([]);
+          }}
+          onEditNode={(id) => handleNodeEdit(id)}
+          onDeleteNode={(id) => deleteNode(id)}
+          onAINode={(id) => {
+            setSelectedNodeId(id);
+            setShowAIAssistant(true);
+          }}
+          onClose={() => setShowNodeList(false)}
         />
       )}
+
+      {contextMenu.visible && createPortal(
+        <div
+          className="context-menu fixed z-50 bg-white border border-gray-300 rounded shadow-lg py-1 px-2 min-w-[180px] pointer-events-auto"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-blue-50 rounded text-gray-800"
+            onClick={() => {
+              console.log('Add Node Here clicked');
+              const canvasRect = canvasRef.current?.getBoundingClientRect();
+              const scrollContainer = scrollContainerRef.current;
+              let x = 100, y = 100;
+              if (canvasRect && scrollContainer) {
+                x = contextMenu.x - canvasRect.left + scrollContainer.scrollLeft;
+                y = contextMenu.y - canvasRect.top + scrollContainer.scrollTop;
+              }
+              createNode(x, y);
+              setContextMenu((cm) => ({ ...cm, visible: false }));
+            }}
+          >
+            <Plus className="w-4 h-4" /> Add Node Here
+          </button>
+          <button
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-gray-100 rounded text-gray-800"
+            onClick={() => {
+              undo();
+              setContextMenu((cm) => ({ ...cm, visible: false }));
+            }}
+          >
+            <RotateCcw className="w-4 h-4" /> Undo
+          </button>
+          <button
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-gray-100 rounded text-gray-800"
+            onClick={() => {
+              redo();
+              setContextMenu((cm) => ({ ...cm, visible: false }));
+            }}
+          >
+            <RotateCw className="w-4 h-4" /> Redo
+          </button>
+          <button
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-purple-50 rounded text-gray-800"
+            onClick={() => {
+              setShowAIAssistant((show) => !show);
+              setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 100);
+            }}
+          >
+            <Bot className="w-4 h-4" /> Toggle AI Assistant
+          </button>
+          <button
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-green-50 rounded text-gray-800"
+            onClick={() => {
+              exportToJSON();
+              setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 200);
+            }}
+          >
+            <FileDown className="w-4 h-4" /> Export JSON
+          </button>
+          <button
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-yellow-50 rounded text-gray-800"
+            onClick={() => {
+              exportToImage();
+              setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 200);
+            }}
+          >
+            <ImageIcon className="w-4 h-4" /> Export Image
+          </button>
+          <button
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-red-50 rounded text-gray-800"
+            onClick={() => {
+              setShowNodeList((show) => !show);
+              setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 100);
+            }}
+          >
+            <ListIcon className="w-4 h-4" /> List Nodes
+          </button>
+          <button
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-gray-200 rounded text-gray-600 mt-2 border-t border-gray-200"
+            onClick={() => setContextMenu((cm) => ({ ...cm, visible: false }))}
+          >
+            Cancel
+          </button>
+        </div>,
+        document.body
+      )}
+      
     </div>
   );
 };

@@ -30,6 +30,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [resizing, setResizing] = useState(false);
   const nodeRef = useRef<HTMLDivElement>(null);
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (node.isEditing && textareaRef.current) {
@@ -42,13 +43,37 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
     setEditText(node.text);
   }, [node.text]);
 
+  // Auto-resize node when text changes (but not during editing or manual resizing)
+  useEffect(() => {
+    if (!node.isEditing && !resizing) {
+      // Only auto-resize if the node hasn't been manually resized recently
+      const hasBeenManuallyResized = node.width !== 200; // Check if width was changed from default
+      if (!hasBeenManuallyResized) {
+        autoResizeNode(node.text, true); // Immediate resize when not editing
+      }
+    }
+  }, [node.text, node.isEditing, resizing, node.width]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       onSave(editText);
+      // Auto-resize after saving
+      setTimeout(() => autoResizeNode(editText, true), 100);
     } else if (e.key === "Escape") {
       setEditText(node.text);
       onSave(node.text);
+      // Auto-resize after saving
+      setTimeout(() => autoResizeNode(node.text, true), 100);
     }
   };
 
@@ -64,8 +89,86 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
     }
   };
 
+  // Calculate required dimensions based on text content
+  const calculateTextDimensions = (text: string) => {
+    // Create a temporary div to measure text dimensions
+    const tempDiv = document.createElement('div');
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.visibility = 'hidden';
+    tempDiv.style.whiteSpace = 'pre-wrap';
+    tempDiv.style.wordBreak = 'break-words';
+    tempDiv.style.fontSize = '14px'; // text-sm
+    tempDiv.style.fontWeight = '500'; // font-medium
+    tempDiv.style.lineHeight = '1.6'; // Consistent with display
+    tempDiv.style.padding = '16px'; // p-4
+    tempDiv.style.width = `${node.width - 32}px`; // Use current node width minus padding
+    tempDiv.style.height = 'auto';
+    tempDiv.textContent = text || "Double-click to edit";
+    
+    // Handle empty text case
+    if (!text || text.trim() === '') {
+      tempDiv.textContent = "Double-click to edit";
+    }
+    
+    document.body.appendChild(tempDiv);
+    
+    const rect = tempDiv.getBoundingClientRect();
+    const contentHeight = rect.height;
+    
+    document.body.removeChild(tempDiv);
+    
+    // Calculate final dimensions - keep width fixed, only adjust height
+    const padding = 32; // 16px on each side
+    const resizeHandlePadding = 24; // Extra padding for resize handle (6px * 4)
+    const width = node.width; // Keep current width
+    const height = Math.max(50, contentHeight + padding + resizeHandlePadding);
+    
+    return { width, height };
+  };
+
+  // Auto-resize node based on text content with debouncing
+  const autoResizeNode = (text: string, immediate: boolean = false) => {
+    // Clear existing timeout
+    if (resizeTimeoutRef.current) {
+      clearTimeout(resizeTimeoutRef.current);
+    }
+
+    const performResize = () => {
+      const { width, height } = calculateTextDimensions(text);
+      const currentHeight = node.height;
+      const currentWidth = node.width;
+      
+      // Check if node has been manually resized
+      const hasBeenManuallyResized = currentWidth !== 200;
+      
+      if (hasBeenManuallyResized) {
+        // If manually resized, only adjust height to fit content
+        const heightDiff = Math.abs(height - currentHeight);
+        if (heightDiff > 10) {
+          onResize(currentWidth, height); // Keep current width, adjust height
+        }
+      } else {
+        // If not manually resized, allow both width and height adjustments
+        const widthDiff = Math.abs(width - currentWidth);
+        const heightDiff = Math.abs(height - currentHeight);
+        
+        if (widthDiff > 10 || heightDiff > 10) {
+          onResize(width, height);
+        }
+      }
+    };
+
+    if (immediate) {
+      performResize();
+    } else {
+      // Debounce resize to avoid too frequent updates during typing
+      resizeTimeoutRef.current = setTimeout(performResize, 300);
+    }
+  };
+
   // Resize logic
   const handleResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     setResizing(true);
     const startX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
@@ -76,8 +179,8 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
     const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
       const moveX = moveEvent instanceof TouchEvent ? moveEvent.touches[0].clientX : (moveEvent as MouseEvent).clientX;
       const moveY = moveEvent instanceof TouchEvent ? moveEvent.touches[0].clientY : (moveEvent as MouseEvent).clientY;
-      const newWidth = Math.max(100, startWidth + (moveX - startX));
-      const newHeight = Math.max(40, startHeight + (moveY - startY));
+      const newWidth = Math.max(150, startWidth + (moveX - startX));
+      const newHeight = Math.max(60, startHeight + (moveY - startY));
       onResize(newWidth, newHeight);
     };
 
@@ -98,9 +201,12 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
   return (
     <div
       ref={nodeRef}
-      className={`absolute select-none touch-none group transition-all duration-200 ${
+      data-node="true"
+      className={`absolute select-none touch-none group transition-all duration-300 ease-out ${
         isDragging ? "scale-105 z-50" : "hover:scale-105"
-      } ${highlighted ? "ring-4 ring-green-400 animate-pulse" : ""}`}
+      } ${highlighted ? "ring-4 ring-green-400 animate-pulse" : ""} ${
+        resizing ? "ring-2 ring-blue-400" : ""
+      }`}
       style={{
         left: node.x,
         top: node.y,
@@ -132,7 +238,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-4 w-full h-full">
+        <div className="p-4 w-full h-full overflow-hidden">
           {node.isEditing ? (
             <textarea
               ref={textareaRef}
@@ -142,14 +248,19 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
                 adjustTextareaHeight();
               }}
               onKeyDown={handleKeyDown}
-              onBlur={() => onSave(editText)}
-              className="w-full bg-transparent border-none outline-none resize-none text-gray-800 font-medium text-sm leading-relaxed"
-              style={{ minHeight: "60px" }}
-              placeholder="Enter your text..."
+              onBlur={() => {
+                onSave(editText);
+                // Auto-resize after saving
+                setTimeout(() => autoResizeNode(editText, true), 100);
+              }}
+              className="w-full bg-transparent border-none outline-none resize-none text-gray-800 font-medium text-sm leading-relaxed overflow-hidden pr-6 pb-6"
+              style={{ minHeight: "60px", lineHeight: '1.6' }}
+              placeholder="Type your text here..."
             />
           ) : (
             <div
-              className="w-full h-full text-gray-800 font-medium text-sm leading-relaxed whitespace-pre-wrap break-words cursor-text"
+              className="w-full h-full text-gray-800 font-medium text-sm leading-relaxed whitespace-pre-wrap break-words cursor-text overflow-hidden pr-6 pb-6"
+              style={{ lineHeight: '1.6' }}
               onClick={handleDoubleClick}
             >
               {node.text || "Double-click to edit"}
@@ -160,15 +271,23 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
         {/* Resize Handle */}
         {showActions && !node.isEditing && (
           <div
-            className="absolute bottom-1 right-1 w-4 h-4 bg-white border border-gray-300 rounded cursor-nwse-resize flex items-center justify-center z-20"
-            style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}
+            className={`absolute bottom-2 right-2 w-6 h-6 bg-white/95 backdrop-blur-sm border border-gray-300 rounded cursor-nwse-resize flex items-center justify-center z-30 shadow-md hover:bg-white hover:shadow-lg transition-all duration-200 ${
+              resizing ? "bg-blue-50 border-blue-300 shadow-lg" : ""
+            }`}
             onMouseDown={handleResizeStart}
             onTouchStart={handleResizeStart}
-            title="Resize"
+            onDoubleClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // Reset to default width and auto-size
+              onResize(200, 50);
+              setTimeout(() => autoResizeNode(node.text, true), 100);
+            }}
+            title="Drag to resize, double-click to auto-size"
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2 10L10 2" stroke="#888" strokeWidth="2" strokeLinecap="round"/>
-              <circle cx="10" cy="2" r="1" fill="#888"/>
+            <svg width="14" height="14" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2 10L10 2" stroke="#666" strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="10" cy="2" r="1" fill="#666"/>
             </svg>
           </div>
         )}
