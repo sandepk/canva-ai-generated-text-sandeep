@@ -43,4 +43,58 @@ html, body {
     position: fixed;
     width: 100%;
   }
+  
+  /* iOS Safari specific fixes */
+  .overscroll-contain {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  
+  /* Prevent toolbar shifting on iOS */
+  .fixed {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+  
+  /* Mobile scrolling fixes */
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+  }
+  
+  .overflow-y-auto::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Force touch scrolling on mobile */
+  @supports (-webkit-touch-callout: none) {
+    .overflow-y-auto {
+      -webkit-overflow-scrolling: touch !important;
+    }
+  }
+  
+  /* NodeList specific mobile scrolling */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+    overscroll-behavior: contain !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Prevent NodeList overflow on mobile */
+  @media screen and (max-width: 768px) {
+    .mobile-scroll {
+      max-height: calc(45vh - env(safe-area-inset-bottom, 0px)) !important;
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
+    }
+  }
+  
+  /* Ensure NodeList container properly contains content */
+  .overflow-hidden {
+    overflow: hidden !important;
+  }
 }

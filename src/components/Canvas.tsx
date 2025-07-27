@@ -149,9 +149,36 @@ const Canvas: React.FC = () => {
     }
   };
 
+  const scrollToNode = (nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    const scrollContainer = scrollContainerRef.current;
+    
+    if (!node || !scrollContainer) return;
+    
+    // Calculate the center of the node
+    const nodeCenterX = node.x + node.width / 2;
+    const nodeCenterY = node.y + node.height / 2;
+    
+    // Calculate the scroll position to center the node
+    const scrollLeft = nodeCenterX - scrollContainer.clientWidth / 2;
+    const scrollTop = nodeCenterY - scrollContainer.clientHeight / 2;
+    
+    // Smooth scroll to the node
+    scrollContainer.scrollTo({
+      left: Math.max(0, scrollLeft),
+      top: Math.max(0, scrollTop),
+      behavior: 'smooth'
+    });
+    
+    // Highlight the node briefly
+    setHighlightedNodeId(nodeId);
+    setTimeout(() => setHighlightedNodeId(null), 2000);
+  };
+
   const handleStartDrag = (e: React.MouseEvent | React.TouchEvent, nodeId: string) => {
     const target = e.target as HTMLDivElement;
     const rect = target.getBoundingClientRect();
+    const scrollContainer = scrollContainerRef.current;
     
     // Handle both mouse and touch events
     let clientX: number, clientY: number;
@@ -165,8 +192,19 @@ const Canvas: React.FC = () => {
       clientY = e.clientY;
     }
     
-    const offsetX = clientX - rect.left;
-    const offsetY = clientY - rect.top;
+    // Calculate offset relative to the node's actual position in the canvas
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect || !scrollContainer) return;
+    
+    // Get the current node to calculate proper offset
+    const currentNode = nodes.find(n => n.id === nodeId);
+    if (!currentNode) return;
+    
+    // Calculate offset from the node's actual position to the click point
+    const nodeScreenX = currentNode.x + canvasRect.left - scrollContainer.scrollLeft;
+    const nodeScreenY = currentNode.y + canvasRect.top - scrollContainer.scrollTop;
+    const offsetX = clientX - nodeScreenX;
+    const offsetY = clientY - nodeScreenY;
   
     setDragState({
       isDragging: true,
@@ -191,10 +229,20 @@ const Canvas: React.FC = () => {
       const scrollContainer = scrollContainerRef.current;
       
       if (canvasRect && scrollContainer) {
+        // Calculate new position based on mouse/touch position and offset
         const newX = moveX - canvasRect.left + scrollContainer.scrollLeft - offsetX;
         const newY = moveY - canvasRect.top + scrollContainer.scrollTop - offsetY;
         
-        updateNode(nodeId, { x: newX, y: newY });
+        // Ensure the node doesn't go outside reasonable bounds
+        const minX = -currentNode.width + 50; // Allow some overflow for dragging
+        const minY = -currentNode.height + 50;
+        const maxX = Math.max(window.innerWidth, scrollContainer.scrollWidth) - 50;
+        const maxY = Math.max(window.innerHeight, scrollContainer.scrollHeight) - 50;
+        
+        const clampedX = Math.max(minX, Math.min(newX, maxX));
+        const clampedY = Math.max(minY, Math.min(newY, maxY));
+        
+        updateNode(nodeId, { x: clampedX, y: clampedY });
       }
     };
 
@@ -411,6 +459,32 @@ const Canvas: React.FC = () => {
       window.removeEventListener("click", handleClickOutside);
     };
   }, [contextMenu.visible, showContextSidebar]);
+
+  // Keyboard navigation for scrolling to nodes
+  useEffect(() => {
+    const handleKeyboardNavigation = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + G to scroll to first node
+      if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+        e.preventDefault();
+        if (nodes.length > 0) {
+          scrollToNode(nodes[0].id);
+        }
+      }
+      
+      // Ctrl/Cmd + Shift + G to scroll to last node
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'G') {
+        e.preventDefault();
+        if (nodes.length > 0) {
+          scrollToNode(nodes[nodes.length - 1].id);
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyboardNavigation);
+    return () => {
+      document.removeEventListener("keydown", handleKeyboardNavigation);
+    };
+  }, [nodes]);
   const exportToJSON = () => {
     const json = JSON.stringify(nodes, null, 2);
     const blob = new Blob([json], { type: "application/json" });
@@ -425,7 +499,72 @@ const Canvas: React.FC = () => {
   const exportToImage = async () => {
     if (!canvasRef.current) return;
     try {
-      const canvas = await html2canvas(canvasRef.current);
+      // Calculate the bounds of all nodes to determine the full canvas area
+      let minX = 0, minY = 0, maxX = window.innerWidth, maxY = window.innerHeight;
+      
+      if (nodes.length > 0) {
+        minX = Math.min(...nodes.map(node => node.x));
+        minY = Math.min(...nodes.map(node => node.y));
+        maxX = Math.max(...nodes.map(node => node.x + node.width));
+        maxY = Math.max(...nodes.map(node => node.y + node.height));
+      }
+      
+      // Add padding around the nodes
+      const padding = 100;
+      const canvasWidth = Math.max(maxX - minX + padding * 2, window.innerWidth);
+      const canvasHeight = Math.max(maxY - minY + padding * 2, window.innerHeight);
+      
+      // Create a temporary container with the full canvas area
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.top = '-9999px';
+      tempContainer.style.width = `${canvasWidth}px`;
+      tempContainer.style.height = `${canvasHeight}px`;
+      tempContainer.style.backgroundImage = "radial-gradient(circle, #e5e7eb 1px, transparent 1px)";
+      tempContainer.style.backgroundSize = "20px 20px";
+      tempContainer.style.backgroundColor = '#f9fafb';
+      tempContainer.style.overflow = 'hidden';
+      
+      // Clone all nodes and position them relative to the new container
+      nodes.forEach(node => {
+        const nodeElement = document.createElement('div');
+        nodeElement.style.position = 'absolute';
+        nodeElement.style.left = `${node.x - minX + padding}px`;
+        nodeElement.style.top = `${node.y - minY + padding}px`;
+        nodeElement.style.width = `${node.width}px`;
+        nodeElement.style.height = `${node.height}px`;
+        nodeElement.style.backgroundColor = node.color;
+        nodeElement.style.borderRadius = '8px';
+        nodeElement.style.padding = '12px';
+        nodeElement.style.fontSize = '14px';
+        nodeElement.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        nodeElement.style.color = '#1f2937';
+        nodeElement.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+        nodeElement.style.border = '1px solid rgba(0, 0, 0, 0.1)';
+        nodeElement.style.whiteSpace = 'pre-wrap';
+        nodeElement.style.wordBreak = 'break-word';
+        nodeElement.style.overflow = 'hidden';
+        nodeElement.textContent = node.text;
+        
+        tempContainer.appendChild(nodeElement);
+      });
+      
+      document.body.appendChild(tempContainer);
+      
+      // Capture the full canvas area
+      const canvas = await html2canvas(tempContainer, {
+        width: canvasWidth,
+        height: canvasHeight,
+        scale: 2, // Higher resolution
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#f9fafb'
+      });
+      
+      // Clean up
+      document.body.removeChild(tempContainer);
+      
       const imgData = canvas.toDataURL("image/png");
       const a = document.createElement("a");
       a.href = imgData;
@@ -533,22 +672,7 @@ const Canvas: React.FC = () => {
         <NodeList
           nodes={nodes}
           highlightedNodeId={highlightedNodeId}
-          onSelectNode={(id) => {
-            const node = nodes.find((n) => n.id === id);
-            const scrollContainer = scrollContainerRef.current;
-            if (!node || !scrollContainer) return;
-            const nodeCenterX = node.x + node.width / 2;
-            const nodeCenterY = node.y + node.height / 2;
-            const scrollLeft = nodeCenterX - scrollContainer.clientWidth / 2;
-            const scrollTop = nodeCenterY - scrollContainer.clientHeight / 2;
-            scrollContainer.scrollTo({
-              left: scrollLeft,
-              top: scrollTop,
-              behavior: "smooth",
-            });
-            setHighlightedNodeId(id);
-            setTimeout(() => setHighlightedNodeId(null), 2000);
-          }}
+          onSelectNode={scrollToNode}
           onRemoveAll={() => {
             setNodes([]);
           }}

@@ -40,7 +40,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
         style={{
           top: window.innerWidth >= 768 ? '1rem' : (isKeyboardOpen ? 'auto' : Math.max(8, Math.min(viewportHeight * 0.03, 24)) + 'px'),
           bottom: isKeyboardOpen ? '1rem' : 'auto',
-          position: 'fixed'
+          position: 'fixed',
+          transform: 'translateZ(0)', // Force hardware acceleration on iOS
+          willChange: 'transform' // Optimize for animations
         }}
         role="toolbar"
         aria-label="Canvas Studio toolbar with quick actions"
