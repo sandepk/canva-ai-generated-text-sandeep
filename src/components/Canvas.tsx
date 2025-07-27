@@ -8,6 +8,7 @@ import Toolbar from "./Toolbar";
 import { generateText } from "../services/api";
 import { Plus, Bot, FileDown, Image as ImageIcon, ListIcon } from "lucide-react";
 import NodeList from "./NodeList";
+import ContextSidebar from "./ContextSidebar";
 
 const COLORS = [
   "#3B82F6", // blue
@@ -49,6 +50,7 @@ const Canvas: React.FC = () => {
     x: number;
     y: number;
   }>({ visible: false, x: 0, y: 0 });
+  const [showContextSidebar, setShowContextSidebar] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -225,27 +227,37 @@ const Canvas: React.FC = () => {
     const menuHeight = 280; // Approximate height
     const margin = 10;
     
+    // Check if it's mobile (screen width less than 768px)
+    const isMobile = window.innerWidth < 768;
+    
     let adjustedX = x;
     let adjustedY = y;
     
-    // Ensure menu doesn't go off the right edge
-    if (x + menuWidth > window.innerWidth - margin) {
-      adjustedX = window.innerWidth - menuWidth - margin;
-    }
-    
-    // Ensure menu doesn't go off the bottom edge
-    if (y + menuHeight > window.innerHeight - margin) {
-      adjustedY = window.innerHeight - menuHeight - margin;
-    }
-    
-    // Ensure menu doesn't go off the left edge
-    if (x < margin) {
+    if (isMobile) {
+      // For mobile, position at bottom left
       adjustedX = margin;
-    }
-    
-    // Ensure menu doesn't go off the top edge
-    if (y < margin) {
-      adjustedY = margin;
+      adjustedY = window.innerHeight - menuHeight - margin;
+    } else {
+      // For desktop, use the original positioning logic
+      // Ensure menu doesn't go off the right edge
+      if (x + menuWidth > window.innerWidth - margin) {
+        adjustedX = window.innerWidth - menuWidth - margin;
+      }
+      
+      // Ensure menu doesn't go off the bottom edge
+      if (y + menuHeight > window.innerHeight - margin) {
+        adjustedY = window.innerHeight - menuHeight - margin;
+      }
+      
+      // Ensure menu doesn't go off the left edge
+      if (x < margin) {
+        adjustedX = margin;
+      }
+      
+      // Ensure menu doesn't go off the top edge
+      if (y < margin) {
+        adjustedY = margin;
+      }
     }
     
     return { x: adjustedX, y: adjustedY };
@@ -254,8 +266,15 @@ const Canvas: React.FC = () => {
   const handleCanvasContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     if (dragState.isDragging) return;
-    const position = calculateContextMenuPosition(e.clientX, e.clientY);
-    setContextMenu({ x: position.x, y: position.y, visible: true });
+    
+    // Check if it's mobile
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      setShowContextSidebar(true);
+    } else {
+      const position = calculateContextMenuPosition(e.clientX, e.clientY);
+      setContextMenu({ x: position.x, y: position.y, visible: true });
+    }
   };
 
   // Mobile touch handlers for context menu
@@ -266,8 +285,7 @@ const Canvas: React.FC = () => {
     
     const touch = e.touches[0];
     const timeoutId = setTimeout(() => {
-      const position = calculateContextMenuPosition(touch.clientX, touch.clientY);
-      setContextMenu({ x: position.x, y: position.y, visible: true });
+      setShowContextSidebar(true);
     }, 500); // 500ms long press
     
     // Store timeout ID to clear it if touch ends before timeout
@@ -327,9 +345,12 @@ const Canvas: React.FC = () => {
   }, [nodes]);
 
   useEffect(() => {
-    if (!contextMenu.visible) return;
+    if (!contextMenu.visible && !showContextSidebar) return;
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setContextMenu((cm) => ({ ...cm, visible: false }));
+      if (e.key === "Escape") {
+        setContextMenu((cm) => ({ ...cm, visible: false }));
+        setShowContextSidebar(false);
+      }
     };
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -343,7 +364,7 @@ const Canvas: React.FC = () => {
       window.removeEventListener("keydown", handleEsc);
       window.removeEventListener("click", handleClickOutside);
     };
-  }, [contextMenu.visible]);
+  }, [contextMenu.visible, showContextSidebar]);
   const exportToJSON = () => {
     const json = JSON.stringify(nodes, null, 2);
     const blob = new Blob([json], { type: "application/json" });
@@ -503,13 +524,14 @@ const Canvas: React.FC = () => {
         />
       )}
 
+      {/* Desktop Context Menu */}
       {contextMenu.visible && createPortal(
         <div
-          className="context-menu fixed z-50 bg-white border border-gray-300 rounded shadow-lg py-1 px-2 min-w-[180px] pointer-events-auto"
+          className="context-menu fixed z-50 bg-white border border-gray-300 rounded shadow-lg py-1 px-2 min-w-[180px] pointer-events-auto sm:min-w-[180px] min-w-[200px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
           <button
-            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-blue-50 rounded text-gray-800"
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-blue-50 rounded text-gray-800 sm:py-1 py-2"
             onClick={() => {
               console.log('Add Node Here clicked');
               const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -527,7 +549,7 @@ const Canvas: React.FC = () => {
           </button>
 
           <button
-            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-purple-50 rounded text-gray-800"
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-purple-50 rounded text-gray-800 sm:py-1 py-2"
             onClick={() => {
               setShowAIAssistant((show) => !show);
               setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 100);
@@ -536,7 +558,7 @@ const Canvas: React.FC = () => {
             <Bot className="w-4 h-4" /> Toggle AI Assistant
           </button>
           <button
-            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-green-50 rounded text-gray-800"
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-green-50 rounded text-gray-800 sm:py-1 py-2"
             onClick={() => {
               exportToJSON();
               setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 200);
@@ -545,7 +567,7 @@ const Canvas: React.FC = () => {
             <FileDown className="w-4 h-4" /> Export JSON
           </button>
           <button
-            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-yellow-50 rounded text-gray-800"
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-yellow-50 rounded text-gray-800 sm:py-1 py-2"
             onClick={() => {
               exportToImage();
               setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 200);
@@ -554,7 +576,7 @@ const Canvas: React.FC = () => {
             <ImageIcon className="w-4 h-4" /> Export Image
           </button>
           <button
-            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-red-50 rounded text-gray-800"
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-red-50 rounded text-gray-800 sm:py-1 py-2"
             onClick={() => {
               setShowNodeList((show) => !show);
               setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 100);
@@ -563,7 +585,7 @@ const Canvas: React.FC = () => {
             <ListIcon className="w-4 h-4" /> List Nodes
           </button>
           <button
-            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-gray-200 rounded text-gray-600 mt-2 border-t border-gray-200"
+            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-gray-200 rounded text-gray-600 mt-2 border-t border-gray-200 sm:py-1 py-2"
             onClick={() => setContextMenu((cm) => ({ ...cm, visible: false }))}
           >
             Cancel
@@ -571,6 +593,17 @@ const Canvas: React.FC = () => {
         </div>,
         document.body
       )}
+
+      {/* Mobile Context Sidebar */}
+      <ContextSidebar
+        isVisible={showContextSidebar}
+        onClose={() => setShowContextSidebar(false)}
+        onToggleAI={() => setShowAIAssistant(!showAIAssistant)}
+        onExportJSON={exportToJSON}
+        onExportImage={exportToImage}
+        onToggleNodeList={() => setShowNodeList(!showNodeList)}
+        showNodeList={showNodeList}
+      />
       
     </div>
   );
