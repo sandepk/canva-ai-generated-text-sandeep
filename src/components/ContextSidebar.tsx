@@ -139,11 +139,21 @@ const ContextSidebar: React.FC<ContextSidebarProps> = ({
 
         {/* Footer */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">
-          <div className="text-center text-sm text-gray-500 space-y-1">
+          <div className="text-center text-sm text-gray-500 space-y-2">
             <p>Long press anywhere on canvas to open this menu</p>
-            <p className="text-xs text-gray-400">
-              Designed by Sandeep K Gupta | SDE 2 | IIT Kanpur
-            </p>
+            <div className="flex flex-col items-center space-y-1">
+              <p className="text-xs text-gray-400 font-medium">
+                Sandeep K Gupta | SDE 2 | IIT Kanpur
+              </p>
+              <a 
+                href="https://www.statisfy.com/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-xs font-bold text-white bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-4 py-2 rounded-xl shadow-lg border border-purple-300 transform hover:scale-105 transition-all duration-200 cursor-pointer hover:shadow-xl"
+              >
+                Statisfy
+              </a>
+            </div>
           </div>
         </div>
       </div>
