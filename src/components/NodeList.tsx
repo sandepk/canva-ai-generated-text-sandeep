@@ -25,8 +25,9 @@ const NodeList: React.FC<NodeListProps> = ({
 }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   return (
-    <div className="absolute z-40 bg-white shadow-lg rounded-lg p-4 w-72 max-h-[50vh] overflow-y-auto sm:top-28 sm:right-4 sm:w-72 sm:max-h-[65vh] top-auto bottom-6 right-2 w-64">
-      <div className="bg-blue-50 rounded-t-lg px-4 py-2 border-b border-gray-200">
+    <div className="absolute z-40 bg-white shadow-lg rounded-lg w-64 sm:w-72 sm:top-28 sm:right-4 top-auto bottom-6 right-2 h-[40vh] sm:h-[65vh] flex flex-col">
+      {/* Fixed Header */}
+      <div className="bg-blue-50 rounded-t-lg px-4 py-2 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-blue-800 text-base font-semibold tracking-wide">
             All Nodes ({nodes.length})
@@ -82,7 +83,10 @@ const NodeList: React.FC<NodeListProps> = ({
           </div>
         )}
       </div>
-      <ul className="space-y-1">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-4">
+          <ul className="space-y-1">
         {nodes.map((node, index) => (
           <li
             key={node.id}
@@ -144,7 +148,9 @@ const NodeList: React.FC<NodeListProps> = ({
             </div>
           </li>
         ))}
-      </ul>
+          </ul>
+        </div>
+      </div>
     </div>
   );
 };

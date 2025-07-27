@@ -1,5 +1,53 @@
-import React from "react";
-import { Plus, Bot, FileDown, Image as ImageIcon, ListIcon, X } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { Plus, Bot, FileDown, Image as ImageIcon, ListIcon, X, Mic, MicOff } from "lucide-react";
+
+// Speech Recognition types
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionErrorEvent {
+  error: string;
+  message: string;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
 
 interface ContextSidebarProps {
   isVisible: boolean;
@@ -9,6 +57,7 @@ interface ContextSidebarProps {
   onExportImage: () => void;
   onToggleNodeList: () => void;
   showNodeList: boolean;
+  onAddNodeWithText: (text: string) => void;
 }
 
 const ContextSidebar: React.FC<ContextSidebarProps> = ({
@@ -19,8 +68,87 @@ const ContextSidebar: React.FC<ContextSidebarProps> = ({
   onExportImage,
   onToggleNodeList,
   showNodeList,
+  onAddNodeWithText,
 }) => {
+  // Microphone state
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const finalTranscriptRef = useRef<string>("");
+
+  // Initialize speech recognition
+  const initSpeechRecognition = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Speech recognition is not supported in this browser.');
+      return null;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+      let finalTranscript = '';
+      let interimTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      const currentTranscript = finalTranscript || interimTranscript;
+      setTranscript(currentTranscript);
+      
+      // Store the final transcript for use in onend
+      if (finalTranscript) {
+        finalTranscriptRef.current = finalTranscript;
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+      setTranscript("");
+      finalTranscriptRef.current = ""; // Clear on error
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      // Use the stored final transcript
+      const finalTranscript = finalTranscriptRef.current.trim();
+      if (finalTranscript) {
+        onAddNodeWithText(finalTranscript);
+        setTranscript("");
+        finalTranscriptRef.current = ""; // Clear for next use
+      }
+    };
+
+    return recognition;
+  };
+
   if (!isVisible) return null;
+
+  const toggleMicrophone = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      const recognition = initSpeechRecognition();
+      if (recognition) {
+        recognitionRef.current = recognition;
+        recognition.start();
+        setIsListening(true);
+        setTranscript("");
+        finalTranscriptRef.current = ""; // Clear previous transcript
+      }
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 sm:hidden">
@@ -60,6 +188,42 @@ const ContextSidebar: React.FC<ContextSidebarProps> = ({
 
         {/* Content */}
         <div className="p-4 space-y-3">
+          {/* Voice Input */}
+          <button
+            onClick={toggleMicrophone}
+            className={`w-full flex items-center gap-3 p-4 rounded-xl shadow-lg transition-all duration-200 transform hover:scale-[1.02] ${
+              isListening
+                ? "bg-gradient-to-r from-red-500 to-red-600 text-white animate-pulse"
+                : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700"
+            }`}
+          >
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              isListening ? "bg-white/20" : "bg-white/20"
+            }`}>
+              {isListening ? (
+                <MicOff className="w-5 h-5" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+            </div>
+            <div className="text-left">
+              <div className="font-semibold">
+                {isListening ? "Stop Recording" : "Create Node with Voice"}
+              </div>
+              <div className={`text-sm ${isListening ? "text-red-100" : "text-blue-100"}`}>
+                {isListening ? "Tap to stop recording" : "Speak to create a new node"}
+              </div>
+            </div>
+          </button>
+
+          {/* Transcript Display */}
+          {isListening && transcript && (
+            <div className="p-3 bg-gray-100 rounded-lg text-sm text-gray-700">
+              <div className="font-medium text-xs text-gray-500 mb-1">Listening...</div>
+              <div className="break-words">{transcript}</div>
+            </div>
+          )}
+
           {/* AI Assistant */}
           <button
             onClick={() => {
@@ -80,9 +244,7 @@ const ContextSidebar: React.FC<ContextSidebarProps> = ({
           {/* Node List */}
           <button
             onClick={() => {
-              if (!showNodeList) {
-                onToggleNodeList();
-              }
+              onToggleNodeList();
               onClose();
             }}
             className={`w-full flex items-center gap-3 p-4 rounded-xl shadow-lg transition-all duration-200 transform hover:scale-[1.02] ${

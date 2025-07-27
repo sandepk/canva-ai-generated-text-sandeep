@@ -73,6 +73,52 @@ const Canvas: React.FC = () => {
     },
     [nodes]
   );
+
+  const createNodeWithText = useCallback(
+    (text: string) => {
+      // Create node at center of viewport
+      const centerX = window.innerWidth / 2 - 100;
+      const centerY = window.innerHeight / 2 - 25;
+      
+      // Calculate text dimensions to auto-size the node
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (context) {
+        context.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        const textMetrics = context.measureText(text);
+        const textWidth = textMetrics.width;
+        const textHeight = 20; // Approximate line height
+        
+        // Calculate node dimensions with padding
+        const padding = 20;
+        const minWidth = 200;
+        const minHeight = 50;
+        const maxWidth = Math.min(window.innerWidth - 100, 600); // Max width with margin
+        
+        const nodeWidth = Math.max(minWidth, Math.min(textWidth + padding * 2, maxWidth));
+        const nodeHeight = Math.max(minHeight, textHeight + padding * 2);
+        
+        // Create node with calculated dimensions
+        const newNode: Node = {
+          id: generateId(),
+          x: centerX,
+          y: centerY,
+          text,
+          color: COLORS[Math.floor(Math.random() * COLORS.length)],
+          width: nodeWidth,
+          height: nodeHeight,
+          isEditing: true,
+        };
+        
+        setNodes((prev) => [...prev, newNode]);
+        return newNode.id;
+      } else {
+        // Fallback to default createNode if canvas context is not available
+        return createNode(centerX, centerY, text);
+      }
+    },
+    [createNode]
+  );
   
 
   const updateNode = useCallback(
@@ -570,7 +616,7 @@ const Canvas: React.FC = () => {
           <button
             className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-red-50 rounded text-gray-800 sm:py-1 py-2"
             onClick={() => {
-              setShowNodeList((show) => !show);
+              setShowNodeList(true);
               setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 100);
             }}
           >
@@ -595,6 +641,7 @@ const Canvas: React.FC = () => {
         onExportImage={exportToImage}
         onToggleNodeList={() => setShowNodeList(!showNodeList)}
         showNodeList={showNodeList}
+        onAddNodeWithText={createNodeWithText}
       />
       
     </div>
