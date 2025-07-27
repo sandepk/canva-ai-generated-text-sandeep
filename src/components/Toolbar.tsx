@@ -8,6 +8,7 @@ import {
   ListIcon,
 } from "lucide-react";
 import ToolbarActions from "./ToolbarActions";
+import { useViewportHeight } from "../hooks/useViewportHeight";
 
 interface ToolbarProps {
   onAddNode: () => void;
@@ -26,20 +27,34 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onExportImage,
   toggleList,
 }) => {
+  const viewportHeight = useViewportHeight();
+  
   return (
-    <div className="fixed top-4 left-4 z-40 flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white/90 backdrop-blur-md rounded-xl p-3 shadow-lg border border-gray-200 max-w-[calc(100vw-2rem)]">
+          <div 
+        className="fixed left-4 z-40 flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white/90 backdrop-blur-md rounded-xl p-3 shadow-lg border border-gray-200 max-w-[calc(100vw-2rem)]"
+        style={{
+          top: window.innerWidth >= 768 ? '1rem' : Math.max(4, Math.min(viewportHeight * 0.02, 20)) + 'px'
+        }}
+        role="toolbar"
+        aria-label="Canvas Studio toolbar with quick actions"
+      >
       <a 
         href="https://www.statisfy.com/" 
         target="_blank" 
         rel="noopener noreferrer"
-        className="flex items-center gap-2 bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200 rounded-lg px-3 py-2 shadow-sm flex-shrink-0 hover:shadow-md transition-all duration-200 cursor-pointer"
+        className="flex items-center gap-2 bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200 rounded-lg px-3 py-2 shadow-sm flex-shrink-0 hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        aria-label="Visit Statisfy website - Opens in new tab"
+        role="link"
+        tabIndex={0}
       >
-        <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-lg">
+        <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-lg" aria-hidden="true">
           <svg 
             className="w-5 h-5 text-blue-600" 
             fill="none" 
             stroke="currentColor" 
             viewBox="0 0 24 24"
+            aria-hidden="true"
+            role="img"
           >
             <path 
               strokeLinecap="round" 
@@ -68,6 +83,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         onExportImage={onExportImage}
         toggleList={toggleList}
         className="flex flex-wrap items-center gap-1 text-xs sm:text-sm"
+        aria-label="Toolbar action buttons"
       />
     </div>
   );

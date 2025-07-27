@@ -1,3 +1,46 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Remove default scroll behavior */
+html, body {
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Prevent scroll on all elements by default */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+/* Hide scrollbars for WebKit browsers */
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile viewport fixes */
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari */
+  html, body {
+    height: -webkit-fill-available;
+  }
+}
+
+/* Prevent mobile browser address bar from affecting layout */
+@media screen and (max-width: 768px) {
+  html {
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  body {
+    height: 100%;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+  }
+}

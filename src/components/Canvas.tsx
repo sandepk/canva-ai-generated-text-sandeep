@@ -391,20 +391,14 @@ const Canvas: React.FC = () => {
   };
 
   useEffect(() => {
-    if (canvasRef.current) {
-      if (nodes.length === 0) {
-        canvasRef.current.scrollTop = 0;
-        canvasRef.current.scrollLeft = 0;
-        canvasRef.current.style.minWidth = "100%";
-        canvasRef.current.style.minHeight = "100%";
-        setShowNodeList(false);
-      }
+    if (nodes.length === 0) {
+      setShowNodeList(false);
     }
   }, [nodes.length]);
   useEffect(() => {
     const updateSize = () => {
-      const width = Math.max(window.innerWidth * 1.5, 1200);
-      const height = Math.max(window.innerHeight * 1.5, 1200);
+      const width = window.innerWidth;
+      const height = window.innerHeight;
       setMinSize({ width, height });
     };
 
@@ -426,7 +420,7 @@ const Canvas: React.FC = () => {
 
       <div
         ref={scrollContainerRef}
-        className={`w-full h-screen ${nodes.length > 0 ? "overflow-auto" : "overflow-hidden"} touch-pan-x touch-pan-y`}
+        className="w-full h-screen overflow-hidden"
       >
         <div
           ref={canvasRef}
@@ -435,13 +429,11 @@ const Canvas: React.FC = () => {
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           onTouchMove={handleTouchMove}
-          className={`relative ${nodes.length === 0 ? "w-full h-full" : ""} cursor-crosshair`}
+          className="relative w-full h-full cursor-crosshair"
           style={{
             backgroundImage:
               "radial-gradient(circle, #e5e7eb 1px, transparent 1px)",
             backgroundSize: "20px 20px",
-            minWidth: nodes.length > 0 ? `${minSize.width}px` : undefined,
-            minHeight: nodes.length > 0 ? `${minSize.height}px` : undefined,
           }}
         >
           {nodes.map((node) => (
