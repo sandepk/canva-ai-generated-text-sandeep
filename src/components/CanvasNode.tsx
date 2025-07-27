@@ -11,6 +11,7 @@ interface CanvasNodeProps {
   onDelete: () => void;
   onAIUpdate: (prompt: string) => void;
   highlighted?: boolean;
+  onResize: (width: number, height: number) => void;
 }
 
 const CanvasNode: React.FC<CanvasNodeProps> = ({
@@ -22,10 +23,13 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
   onDelete,
   onAIUpdate,
   highlighted = false,
+  onResize,
 }) => {
   const [editText, setEditText] = useState(node.text);
   const [showActions, setShowActions] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [resizing, setResizing] = useState(false);
+  const nodeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (node.isEditing && textareaRef.current) {
@@ -60,8 +64,40 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
     }
   };
 
+  // Resize logic
+  const handleResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    setResizing(true);
+    const startX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const startY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    const startWidth = node.width;
+    const startHeight = node.height;
+
+    const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const moveX = moveEvent instanceof TouchEvent ? moveEvent.touches[0].clientX : (moveEvent as MouseEvent).clientX;
+      const moveY = moveEvent instanceof TouchEvent ? moveEvent.touches[0].clientY : (moveEvent as MouseEvent).clientY;
+      const newWidth = Math.max(100, startWidth + (moveX - startX));
+      const newHeight = Math.max(40, startHeight + (moveY - startY));
+      onResize(newWidth, newHeight);
+    };
+
+    const handleEnd = () => {
+      setResizing(false);
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleEnd);
+      document.removeEventListener('touchmove', handleMove);
+      document.removeEventListener('touchend', handleEnd);
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('touchmove', handleMove);
+    document.addEventListener('touchend', handleEnd);
+  };
+
   return (
     <div
+      ref={nodeRef}
       className={`absolute select-none touch-none group transition-all duration-200 ${
         isDragging ? "scale-105 z-50" : "hover:scale-105"
       } ${highlighted ? "ring-4 ring-green-400 animate-pulse" : ""}`}
@@ -70,6 +106,8 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
         top: node.y,
         width: node.width,
         minHeight: node.height,
+        height: node.height,
+        zIndex: resizing ? 100 : undefined,
       }}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
@@ -117,6 +155,22 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
             </div>
           )}
         </div>
+
+        {/* Resize Handle */}
+        {showActions && !node.isEditing && (
+          <div
+            className="absolute bottom-1 right-1 w-4 h-4 bg-white border border-gray-300 rounded cursor-nwse-resize flex items-center justify-center z-20"
+            style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}
+            onMouseDown={handleResizeStart}
+            onTouchStart={handleResizeStart}
+            title="Resize"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2 10L10 2" stroke="#888" strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="10" cy="2" r="1" fill="#888"/>
+            </svg>
+          </div>
+        )}
 
         {/* Action Buttons */}
         {showActions && !node.isEditing && (

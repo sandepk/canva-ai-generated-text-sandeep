@@ -318,6 +318,7 @@ const Canvas: React.FC = () => {
                 setSelectedNodeId(node.id);
                 setShowAIAssistant(true);
               }}
+              onResize={(width, height) => updateNode(node.id, { width, height })}
             />
           ))}
 
