@@ -5,8 +5,18 @@ import CanvasNode from "./CanvasNode";
 import AIAssistant from "./AIAssistant";
 import Toolbar from "./Toolbar";
 import { generateText } from "../services/api";
-import { Plus } from "lucide-react";
+import {
+  Plus,
+  Bot,
+  Layout,
+  FileDown,
+  Image as ImageIcon,
+  ListIcon,
+  RotateCcw, // Undo
+  RotateCw, // Redo
+} from "lucide-react";
 import NodeList from "./NodeList";
+import { createPortal } from 'react-dom';
 
 const COLORS = [
   "#3B82F6", // blue
@@ -59,6 +69,9 @@ const Canvas: React.FC = () => {
     null,
   );
   const [showNodeList, setShowNodeList] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; visible: boolean }>(
+    { x: 0, y: 0, visible: false }
+  );
 
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
@@ -74,24 +87,23 @@ const Canvas: React.FC = () => {
 
   const createNode = useCallback(
     (x: number, y: number, text: string = "New Node", color?: string, emoji?: string) => {
-      pushToUndoStack(nodes);
-      let displayText = text;
-      if (emoji) {
-        displayText = emoji + " " + text;
-      }
-      const newNode: Node = {
-        id: generateId(),
-        x,
-        y,
-        text: displayText,
-        color: color || COLORS[Math.floor(Math.random() * COLORS.length)],
-        width: 200,
-        height: 50,
-      };
-      setNodes((prev) => [...prev, newNode]);
-      return newNode.id;
+      setNodes(prev => {
+        pushToUndoStack(prev);
+        let displayText = text;
+        if (emoji) displayText = emoji + " " + text;
+        const newNode: Node = {
+          id: generateId(),
+          x,
+          y,
+          text: displayText,
+          color: color || COLORS[Math.floor(Math.random() * COLORS.length)],
+          width: 200,
+          height: 50,
+        };
+        return [...prev, newNode];
+      });
     },
-    [nodes, pushToUndoStack],
+    [pushToUndoStack],
   );
 
   const updateNode = useCallback(
@@ -177,14 +189,16 @@ const Canvas: React.FC = () => {
         const aiResponse = await generateText(prompt);
         let text = aiResponse;
         let color: string | undefined = undefined;
-        let emoji: string | undefined = undefined;
+        let emoji: string | undefined = '🪄'; // Default emoji
         // Try to parse as JSON for structured styling
         try {
           const parsed = JSON.parse(aiResponse);
           if (typeof parsed === 'object' && parsed !== null) {
             text = parsed.text || text;
             color = parsed.color;
-            emoji = parsed.emoji;
+            if (parsed.emoji !== undefined) {
+              emoji = parsed.emoji;
+            }
           }
         } catch {}
         if (nodeId) {
@@ -287,6 +301,23 @@ const Canvas: React.FC = () => {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
+  useEffect(() => {
+    if (!contextMenu.visible) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setContextMenu((cm) => ({ ...cm, visible: false }));
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [contextMenu.visible]);
+
+  // Context menu handlers
+  const handleCanvasContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, visible: true });
+  };
+
+  
+
   return (
     <div className="relative w-full h-screen bg-gray-50 overflow-hidden">
       <Toolbar
@@ -314,6 +345,7 @@ const Canvas: React.FC = () => {
             minWidth: nodes.length > 0 ? `${minSize.width}px` : undefined,
             minHeight: nodes.length > 0 ? `${minSize.height}px` : undefined,
           }}
+          onContextMenu={handleCanvasContextMenu}
         >
           {nodes.map((node) => (
             <CanvasNode
@@ -332,6 +364,93 @@ const Canvas: React.FC = () => {
               onResize={(width, height) => updateNode(node.id, { width, height })}
             />
           ))}
+
+          {/* Context Menu */}
+          {contextMenu.visible && createPortal(
+            <div
+              className="fixed z-50 bg-white border border-gray-300 rounded shadow-lg py-1 px-2 min-w-[180px] pointer-events-auto"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+            >
+              <button
+                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-blue-50 rounded text-gray-800"
+                onClick={() => {
+                  console.log('Add Node Here clicked');
+                  const canvasRect = canvasRef.current?.getBoundingClientRect();
+                  const scrollContainer = scrollContainerRef.current;
+                  let x = 100, y = 100;
+                  if (canvasRect && scrollContainer) {
+                    x = contextMenu.x - canvasRect.left + scrollContainer.scrollLeft;
+                    y = contextMenu.y - canvasRect.top + scrollContainer.scrollTop;
+                  }
+                  createNode(x, y);
+                  setContextMenu((cm) => ({ ...cm, visible: false }));
+                }}
+              >
+                <Plus className="w-4 h-4" /> Add Node Here
+              </button>
+              <button
+                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-gray-100 rounded text-gray-800"
+                onClick={() => {
+                  undo();
+                  setContextMenu((cm) => ({ ...cm, visible: false }));
+                }}
+              >
+                <RotateCcw className="w-4 h-4" /> Undo
+              </button>
+              <button
+                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-gray-100 rounded text-gray-800"
+                onClick={() => {
+                  redo();
+                  setContextMenu((cm) => ({ ...cm, visible: false }));
+                }}
+              >
+                <RotateCw className="w-4 h-4" /> Redo
+              </button>
+              <button
+                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-purple-50 rounded text-gray-800"
+                onClick={() => {
+                  setShowAIAssistant((show) => !show);
+                  setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 100);
+                }}
+              >
+                <Bot className="w-4 h-4" /> Toggle AI Assistant
+              </button>
+              <button
+                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-green-50 rounded text-gray-800"
+                onClick={() => {
+                  exportToJSON();
+                  setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 200);
+                }}
+              >
+                <FileDown className="w-4 h-4" /> Export JSON
+              </button>
+              <button
+                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-yellow-50 rounded text-gray-800"
+                onClick={() => {
+                  exportToImage();
+                  setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 200);
+                }}
+              >
+                <ImageIcon className="w-4 h-4" /> Export Image
+              </button>
+              <button
+                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-red-50 rounded text-gray-800"
+                onClick={() => {
+                  setShowNodeList((show) => !show);
+                  setTimeout(() => setContextMenu((cm) => ({ ...cm, visible: false })), 100);
+                }}
+              >
+                <ListIcon className="w-4 h-4" /> List Nodes
+              </button>
+              <button
+                className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-gray-200 rounded text-gray-600 mt-2 border-t border-gray-200"
+                onClick={() => setContextMenu((cm) => ({ ...cm, visible: false }))}
+              >
+                Cancel
+              </button>
+            </div>,
+            document.body
+          )}
 
           {nodes.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

@@ -111,6 +111,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
       }}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
+      onContextMenu={e => e.stopPropagation()}
     >
       <div
         className="relative w-full h-full rounded-lg border-2 border-white shadow-md transition-all duration-200 cursor-move"
