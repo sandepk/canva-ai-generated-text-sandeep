@@ -73,14 +73,18 @@ const Canvas: React.FC = () => {
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
   const createNode = useCallback(
-    (x: number, y: number, text: string = "New Node") => {
+    (x: number, y: number, text: string = "New Node", color?: string, emoji?: string) => {
       pushToUndoStack(nodes);
+      let displayText = text;
+      if (emoji) {
+        displayText = emoji + " " + text;
+      }
       const newNode: Node = {
         id: generateId(),
         x,
         y,
-        text,
-        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+        text: displayText,
+        color: color || COLORS[Math.floor(Math.random() * COLORS.length)],
         width: 200,
         height: 50,
       };
@@ -107,15 +111,6 @@ const Canvas: React.FC = () => {
     },
     [nodes, pushToUndoStack],
   );
-
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    if (e.target === canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left - 100;
-      const y = e.clientY - rect.top - 50;
-      createNode(x, y);
-    }
-  };
 
   const handleStartDrag = (
     e: React.MouseEvent | React.TouchEvent,
@@ -180,14 +175,31 @@ const Canvas: React.FC = () => {
     new Promise<void>(async (resolve, reject) => {
       try {
         const aiResponse = await generateText(prompt);
-        if (nodeId) updateNode(nodeId, { text: aiResponse });
-        else {
+        let text = aiResponse;
+        let color: string | undefined = undefined;
+        let emoji: string | undefined = undefined;
+        // Try to parse as JSON for structured styling
+        try {
+          const parsed = JSON.parse(aiResponse);
+          if (typeof parsed === 'object' && parsed !== null) {
+            text = parsed.text || text;
+            color = parsed.color;
+            emoji = parsed.emoji;
+          }
+        } catch {}
+        if (nodeId) {
+          let displayText = text;
+          if (emoji) displayText = emoji + " " + text;
+          updateNode(nodeId, { text: displayText, color: color });
+        } else {
           const rect = canvasRef.current?.getBoundingClientRect();
           if (rect)
             createNode(
               Math.random() * (rect.width - 200),
               Math.random() * (rect.height - 100),
-              aiResponse,
+              text,
+              color,
+              emoji,
             );
         }
         resolve();
@@ -294,7 +306,6 @@ const Canvas: React.FC = () => {
       >
         <div
           ref={canvasRef}
-          onClick={handleCanvasClick}
           className={`relative ${nodes.length === 0 ? "w-full h-full" : ""} cursor-crosshair`}
           style={{
             backgroundImage:
@@ -325,9 +336,27 @@ const Canvas: React.FC = () => {
           {nodes.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="text-center text-gray-400">
-                <Plus className="w-12 h-12 mx-auto mb-4" />
+                <button
+                  className="w-12 h-12 mx-auto mb-4 flex items-center justify-center bg-white rounded-full shadow hover:bg-blue-100 transition pointer-events-auto"
+                  onClick={() => {
+                    // Center node in viewport
+                    const scrollContainer = scrollContainerRef.current;
+                    const canvas = canvasRef.current;
+                    let x = 100, y = 100;
+                    if (scrollContainer && canvas) {
+                      const viewWidth = scrollContainer.clientWidth;
+                      const viewHeight = scrollContainer.clientHeight;
+                      x = Math.max(0, (viewWidth - 200) / 2 + scrollContainer.scrollLeft);
+                      y = Math.max(0, (viewHeight - 50) / 2 + scrollContainer.scrollTop);
+                    }
+                    createNode(x, y);
+                  }}
+                  title="Add node"
+                >
+                  <Plus className="w-12 h-12 text-blue-500" />
+                </button>
                 <p className="text-lg font-medium">
-                  Click anywhere to add a node
+                  Click the plus to add a node
                 </p>
                 <p className="text-sm">Or use the toolbar to get started</p>
               </div>
