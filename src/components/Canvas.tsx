@@ -4,6 +4,7 @@ import { Node, DragState } from "../types";
 import CanvasNode from "./CanvasNode";
 import AIAssistant from "./AIAssistant";
 import Toolbar from "./Toolbar";
+import ToolbarActions from "./ToolbarActions";
 import { generateText } from "../services/api";
 import {
   Plus,
@@ -320,6 +321,21 @@ const Canvas: React.FC = () => {
 
   return (
     <div className="relative w-full h-screen bg-gray-50 overflow-hidden">
+      {/* Mobile Sidebar ToolbarActions */}
+      <div className="fixed bottom-0 left-0 w-full z-50 bg-white border-t border-gray-200 sm:hidden flex justify-around p-2 shadow-lg">
+        <ToolbarActions
+          onAddNode={() => createNode(100, 100)}
+          onToggleAI={() => setShowAIAssistant(!showAIAssistant)}
+          showAI={showAIAssistant}
+          onExportJSON={exportToJSON}
+          onExportImage={exportToImage}
+          toggleList={() => setShowNodeList(!showNodeList)}
+          onUndo={undo}
+          onRedo={redo}
+          className="flex w-full justify-around"
+        />
+      </div>
+      {/* Toolbar always visible */}
       <Toolbar
         onAddNode={() => createNode(100, 100)}
         onToggleAI={() => setShowAIAssistant(!showAIAssistant)}
