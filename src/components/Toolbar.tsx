@@ -6,8 +6,6 @@ import {
   FileDown,
   Image as ImageIcon,
   ListIcon,
-  RotateCcw, // Undo
-  RotateCw, // Redo
 } from "lucide-react";
 import ToolbarActions from "./ToolbarActions";
 
@@ -18,8 +16,6 @@ interface ToolbarProps {
   onExportJSON: () => void;
   onExportImage: () => void;
   toggleList: () => void;
-  onUndo: () => void;
-  onRedo: () => void;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -29,8 +25,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onExportJSON,
   onExportImage,
   toggleList,
-  onUndo,
-  onRedo,
 }) => {
   return (
     <div className="fixed top-4 left-4 z-40 flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white/90 backdrop-blur-md rounded-xl p-3 shadow-lg border border-gray-200 max-w-[calc(100vw-2rem)]">
@@ -68,8 +62,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
         onExportJSON={onExportJSON}
         onExportImage={onExportImage}
         toggleList={toggleList}
-        onUndo={onUndo}
-        onRedo={onRedo}
         className="flex flex-wrap items-center gap-1 text-xs sm:text-sm"
       />
     </div>

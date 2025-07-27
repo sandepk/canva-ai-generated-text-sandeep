@@ -7,6 +7,8 @@ export interface Node {
   width: number;
   height: number;
   isEditing?: boolean;
+  undoStack?: string[];
+  redoStack?: string[];
 }
 
 export interface DragState {

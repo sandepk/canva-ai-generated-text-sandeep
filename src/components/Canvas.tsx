@@ -6,7 +6,7 @@ import CanvasNode from "./CanvasNode";
 import AIAssistant from "./AIAssistant";
 import Toolbar from "./Toolbar";
 import { generateText } from "../services/api";
-import { Plus, RotateCcw, RotateCw, Bot, FileDown, Image as ImageIcon, ListIcon } from "lucide-react";
+import { Plus, Bot, FileDown, Image as ImageIcon, ListIcon } from "lucide-react";
 import NodeList from "./NodeList";
 
 const COLORS = [
@@ -30,31 +30,7 @@ const Canvas: React.FC = () => {
     }
   });
   const [minSize, setMinSize] = useState({ width: 0, height: 0 });
-  const [undoStack, setUndoStack] = useState<Node[][]>([]);
-  const [redoStack, setRedoStack] = useState<Node[][]>([]);
 
-  const pushToUndoStack = useCallback((prevNodes: Node[]) => {
-    setUndoStack((stack) => [...stack, prevNodes]);
-    setRedoStack([]);
-  }, []);
-
-  const undo = () => {
-    if (undoStack.length > 0) {
-      const lastState = undoStack[undoStack.length - 1];
-      setUndoStack((stack) => stack.slice(0, -1)); // removes the last recent item
-      setRedoStack((stack) => [...stack, nodes]);
-      setNodes(lastState);
-    }
-  };
-
-  const redo = () => {
-    if (redoStack.length > 0) {
-      const nextState = redoStack[redoStack.length - 1];
-      setRedoStack((stack) => stack.slice(0, -1));
-      setUndoStack((stack) => [...stack, nodes]);
-      setNodes(nextState);
-    }
-  };
 
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(
     null,
@@ -80,7 +56,6 @@ const Canvas: React.FC = () => {
 
   const createNode = useCallback(
     (x: number, y: number, text: string = "") => {
-      pushToUndoStack([...nodes]); // capture before change
       const newNode: Node = {
         id: generateId(),
         x,
@@ -94,27 +69,25 @@ const Canvas: React.FC = () => {
       setNodes((prev) => [...prev, newNode]);
       return newNode.id;
     },
-    [nodes, pushToUndoStack]
+    [nodes]
   );
   
 
   const updateNode = useCallback(
     (id: string, updates: Partial<Node>) => {
       setNodes((prev) => {
-        pushToUndoStack([...prev]); // ✅ capture before mutation
         return prev.map((node) => (node.id === id ? { ...node, ...updates } : node));
       });
     },
-    [pushToUndoStack]
+    []
   );
   
 
   const deleteNode = useCallback(
     (id: string) => {
-      pushToUndoStack([...nodes]); // capture before deletion
       setNodes((prev) => prev.filter((node) => node.id !== id));
     },
-    [nodes, pushToUndoStack]
+    []
   );
   
   
@@ -153,7 +126,7 @@ const Canvas: React.FC = () => {
       nodeId,
     });
   
-    pushToUndoStack([...nodes]); // snapshot before drag
+
 
     // Add global event listeners for drag move and end
     const handleDragMove = (moveEvent: MouseEvent | TouchEvent) => {
@@ -199,7 +172,50 @@ const Canvas: React.FC = () => {
     if (!text || text.trim() === '') {
       deleteNode(nodeId);
     } else {
-      updateNode(nodeId, { text: text.trim(), isEditing: false });
+      // Save current text to undo stack before updating (text-only undo/redo)
+      const currentNode = nodes.find(n => n.id === nodeId);
+      if (currentNode && currentNode.text !== text.trim()) {
+        const undoStack = currentNode.undoStack || [];
+        const newUndoStack = [...undoStack, currentNode.text];
+        updateNode(nodeId, { 
+          text: text.trim(), 
+          isEditing: false,
+          undoStack: newUndoStack.slice(-10), // Keep only last 10 text changes
+          redoStack: [] // Clear redo stack when new text change is made
+        });
+      } else {
+        updateNode(nodeId, { text: text.trim(), isEditing: false });
+      }
+    }
+  };
+
+  const handleNodeUndo = (nodeId: string) => {
+    const currentNode = nodes.find(n => n.id === nodeId);
+    if (currentNode && currentNode.undoStack && currentNode.undoStack.length > 0) {
+      const undoStack = [...currentNode.undoStack];
+      const previousText = undoStack.pop()!;
+      const redoStack = [...(currentNode.redoStack || []), currentNode.text];
+      
+      updateNode(nodeId, {
+        text: previousText,
+        undoStack: undoStack,
+        redoStack: redoStack.slice(-10) // Keep only last 10 text changes
+      });
+    }
+  };
+
+  const handleNodeRedo = (nodeId: string) => {
+    const currentNode = nodes.find(n => n.id === nodeId);
+    if (currentNode && currentNode.redoStack && currentNode.redoStack.length > 0) {
+      const redoStack = [...currentNode.redoStack];
+      const nextText = redoStack.pop()!;
+      const undoStack = [...(currentNode.undoStack || []), currentNode.text];
+      
+      updateNode(nodeId, {
+        text: nextText,
+        undoStack: undoStack.slice(-10), // Keep only last 10 text changes
+        redoStack: redoStack
+      });
     }
   };
 
@@ -308,23 +324,7 @@ const Canvas: React.FC = () => {
 
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nodes));
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+Z or Cmd+Z
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-        e.preventDefault();
-        undo();
-      }
-
-      // Ctrl+Y or Cmd+Y
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
-        e.preventDefault();
-        redo();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undoStack, redoStack, nodes]);
+  }, [nodes]);
 
   useEffect(() => {
     if (!contextMenu.visible) return;
@@ -401,8 +401,6 @@ const Canvas: React.FC = () => {
         onExportJSON={exportToJSON}
         onExportImage={exportToImage}
         toggleList={() => setShowNodeList(!showNodeList)}
-        onUndo={undo}
-        onRedo={redo}
       />
 
       <div
@@ -440,6 +438,8 @@ const Canvas: React.FC = () => {
                 setShowAIAssistant(true);
               }}
               onResize={(width, height) => updateNode(node.id, { width, height })}
+              onUndo={() => handleNodeUndo(node.id)}
+              onRedo={() => handleNodeRedo(node.id)}
             />
           ))}
 
@@ -491,7 +491,6 @@ const Canvas: React.FC = () => {
             setTimeout(() => setHighlightedNodeId(null), 2000);
           }}
           onRemoveAll={() => {
-            pushToUndoStack([...nodes]);
             setNodes([]);
           }}
           onEditNode={(id) => handleNodeEdit(id)}
@@ -526,24 +525,7 @@ const Canvas: React.FC = () => {
           >
             <Plus className="w-4 h-4" /> Add Node Here
           </button>
-          <button
-            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-gray-100 rounded text-gray-800"
-            onClick={() => {
-              undo();
-              setContextMenu((cm) => ({ ...cm, visible: false }));
-            }}
-          >
-            <RotateCcw className="w-4 h-4" /> Undo
-          </button>
-          <button
-            className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-gray-100 rounded text-gray-800"
-            onClick={() => {
-              redo();
-              setContextMenu((cm) => ({ ...cm, visible: false }));
-            }}
-          >
-            <RotateCw className="w-4 h-4" /> Redo
-          </button>
+
           <button
             className="w-full flex items-center gap-2 text-left px-2 py-1 hover:bg-purple-50 rounded text-gray-800"
             onClick={() => {

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Node } from "../types";
-import { Edit, Trash2, Bot, GripHorizontal } from "lucide-react";
+import { Edit, Trash2, Bot, GripHorizontal, RotateCcw, RotateCw } from "lucide-react";
 
 interface CanvasNodeProps {
   node: Node;
@@ -12,6 +12,8 @@ interface CanvasNodeProps {
   onAIUpdate: (prompt: string) => void;
   highlighted?: boolean;
   onResize: (width: number, height: number) => void;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
 const CanvasNode: React.FC<CanvasNodeProps> = ({
@@ -24,6 +26,8 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
   onAIUpdate,
   highlighted = false,
   onResize,
+  onUndo,
+  onRedo,
 }) => {
   const [editText, setEditText] = useState(node.text);
   const [showActions, setShowActions] = useState(false);
@@ -74,6 +78,18 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
       onSave(node.text);
       // Auto-resize after saving
       setTimeout(() => autoResizeNode(node.text, true), 100);
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      // Only allow undo if there are text changes to undo
+      if (node.undoStack && node.undoStack.length > 0) {
+        onUndo();
+      }
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+      e.preventDefault();
+      // Only allow redo if there are text changes to redo
+      if (node.redoStack && node.redoStack.length > 0) {
+        onRedo();
+      }
     }
   };
 
@@ -293,8 +309,38 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
         )}
 
         {/* Action Buttons */}
-        {showActions && !node.isEditing && (
+        {showActions && (
           <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onUndo();
+              }}
+              disabled={!node.undoStack || node.undoStack.length === 0}
+              className={`p-1.5 rounded-full shadow-lg transition-colors duration-200 ${
+                node.undoStack && node.undoStack.length > 0
+                  ? "bg-gray-500 text-white hover:bg-gray-600"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+              title={`Undo text change${node.undoStack && node.undoStack.length > 0 ? ` (${node.undoStack.length} available)` : ' (none available)'}`}
+            >
+              <RotateCcw className="w-3 h-3" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRedo();
+              }}
+              disabled={!node.redoStack || node.redoStack.length === 0}
+              className={`p-1.5 rounded-full shadow-lg transition-colors duration-200 ${
+                node.redoStack && node.redoStack.length > 0
+                  ? "bg-gray-500 text-white hover:bg-gray-600"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+              title={`Redo text change${node.redoStack && node.redoStack.length > 0 ? ` (${node.redoStack.length} available)` : ' (none available)'}`}
+            >
+              <RotateCw className="w-3 h-3" />
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();

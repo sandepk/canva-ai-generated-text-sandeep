@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Bot, FileDown, Image as ImageIcon, ListIcon, RotateCcw, RotateCw } from "lucide-react";
+import { Plus, Bot, FileDown, Image as ImageIcon, ListIcon } from "lucide-react";
 
 interface ToolbarActionsProps {
   onAddNode: () => void;
@@ -8,8 +8,6 @@ interface ToolbarActionsProps {
   onExportJSON: () => void;
   onExportImage: () => void;
   toggleList: () => void;
-  onUndo: () => void;
-  onRedo: () => void;
   className?: string;
 }
 
@@ -20,8 +18,6 @@ const ToolbarActions: React.FC<ToolbarActionsProps> = ({
   onExportJSON,
   onExportImage,
   toggleList,
-  onUndo,
-  onRedo,
   className = "",
 }) => (
   <div className={`${className} flex-wrap`}>
@@ -33,24 +29,7 @@ const ToolbarActions: React.FC<ToolbarActionsProps> = ({
       <Plus className="w-4 h-4" />
       <span className="hidden sm:inline">Add Node</span>
     </button>
-    <span className="text-gray-300 hidden sm:inline">/</span>
-    <button
-      onClick={onUndo}
-      className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-black rounded-md transition-all duration-200 font-medium"
-      title="Undo"
-    >
-      <RotateCcw className="w-4 h-4" />
-      <span className="hidden sm:inline">Undo</span>
-    </button>
-    <button
-      onClick={onRedo}
-      className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 text-gray-700 hover:bg-gray-100 hover:text-black rounded-md transition-all duration-200 font-medium"
-      title="Redo"
-    >
-      <RotateCw className="w-4 h-4" />
-      <span className="hidden sm:inline">Redo</span>
-    </button>
-    <span className="text-gray-300 hidden sm:inline">/</span>
+
     <button
       onClick={onToggleAI}
       className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md transition-all duration-200 font-medium ${
