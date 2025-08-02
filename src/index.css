@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Force placeholder text to stay on one line */
+textarea::placeholder {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Mobile canvas navigation */
+@media screen and (max-width: 768px) {
+  /* Ensure canvas has enough horizontal space for scrolling */
+  .canvas-scroll {
+    min-width: 200vw !important; /* Allow horizontal scrolling */
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Mobile navigation buttons */
+  .mobile-nav-button {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
 /* Enable scrolling for canvas content */
 html, body {
   overflow: auto;
@@ -88,7 +111,7 @@ html, body {
     }
     
     /* Ensure logo link is always visible */
-    .fixed[role="toolbar"] a[href*="statisfy.com"] {
+    .fixed[role="toolbar"] a[href*="sandeep-portfolio-iitk.vercel.app"] {
       z-index: 51 !important;
       position: relative !important;
       min-width: fit-content !important;

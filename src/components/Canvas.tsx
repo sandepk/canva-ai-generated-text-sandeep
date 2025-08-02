@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import html2canvas from "html2canvas";
-import { Node, DragState } from "../types";
+import { Node, DragState, Connection } from "../types";
 import CanvasNode from "./CanvasNode";
 import AIAssistant from "./AIAssistant";
 import Toolbar from "./Toolbar";
+import DesktopSidebar from "./DesktopSidebar";
 import { generateText } from "../services/api";
-import { Plus, Bot, FileDown, Image as ImageIcon, ListIcon } from "lucide-react";
+import { Plus, Bot, FileDown, Image as ImageIcon, ListIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import NodeList from "./NodeList";
-import ContextSidebar from "./ContextSidebar";
+
 
 const COLORS = [
   "#3B82F6", // blue
@@ -44,6 +45,7 @@ const Canvas: React.FC = () => {
     dragOffset: { x: 0, y: 0 },
     nodeId: null,
   });
+  const [dragCollision, setDragCollision] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{
@@ -52,73 +54,162 @@ const Canvas: React.FC = () => {
     y: number;
   }>({ visible: false, x: 0, y: 0 });
   const [showContextSidebar, setShowContextSidebar] = useState(false);
+  const [showMobileNav, setShowMobileNav] = useState(false);
+  const [selectedColor, setSelectedColor] = useState(COLORS[0]); // Global text color for new nodes
+  const [selectedNodeColor, setSelectedNodeColor] = useState('#3B82F6'); // Global node background color for new nodes
+  const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle'>('rectangle'); // Global shape for new nodes
+  const [nodeStyle, setNodeStyle] = useState<'colored' | 'crystal'>('colored'); // Global node style for new nodes
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [connectingNode, setConnectingNode] = useState<{ nodeId: string; port: 'top' | 'right' | 'bottom' | 'left' } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
+  // Connection functions
+  const handleConnectionStart = (nodeId: string, port: 'top' | 'right' | 'bottom' | 'left') => {
+    setConnectingNode({ nodeId, port });
+  };
+
+  const handleConnectionEnd = (nodeId: string, port: 'top' | 'right' | 'bottom' | 'left') => {
+    if (connectingNode && connectingNode.nodeId !== nodeId) {
+      const newConnection: Connection = {
+        id: generateId(),
+        fromNodeId: connectingNode.nodeId,
+        toNodeId: nodeId,
+        fromPort: connectingNode.port,
+        toPort: port,
+      };
+      setConnections(prev => [...prev, newConnection]);
+    }
+    setConnectingNode(null);
+  };
+
+  const deleteConnection = (connectionId: string) => {
+    setConnections(prev => prev.filter(conn => conn.id !== connectionId));
+  };
+
+  // Check if a position overlaps with existing nodes
+  const checkCollision = useCallback((x: number, y: number, width: number, height: number, excludeId?: string) => {
+    return nodes.some(node => {
+      if (excludeId && node.id === excludeId) return false;
+      
+      // Check for rectangle overlap
+      const overlap = !(x + width < node.x || node.x + node.width < x || 
+                       y + height < node.y || node.y + node.height < y);
+      
+      return overlap;
+    });
+  }, [nodes]);
+
+  // Find a non-overlapping position for a new node
+  const findNonOverlappingPosition = useCallback((x: number, y: number, width: number, height: number) => {
+    let newX = x;
+    let newY = y;
+    let attempts = 0;
+    const maxAttempts = 50;
+    
+    while (checkCollision(newX, newY, width, height) && attempts < maxAttempts) {
+      // Try different positions in a spiral pattern
+      const angle = attempts * Math.PI / 4;
+      const radius = Math.sqrt(attempts) * 20;
+      newX = x + Math.cos(angle) * radius;
+      newY = y + Math.sin(angle) * radius;
+      attempts++;
+    }
+    
+    return { x: newX, y: newY };
+  }, [checkCollision]);
+
   const createNode = useCallback(
     (x: number, y: number, text: string = "") => {
+      // Calculate minimal initial height for empty node
+      const fontSize = isMobile ? 16 : 14;
+      const lineHeight = fontSize * 1.6;
+      const padding = 16; // 8px on each side - reduced padding
+      const initialHeight = lineHeight + padding;
+      const nodeWidth = isMobile ? 160 : 200;
+      
+      // Find non-overlapping position
+      const position = findNonOverlappingPosition(x, y, nodeWidth, initialHeight);
+      
       const newNode: Node = {
         id: generateId(),
-        x,
-        y,
+        x: position.x,
+        y: position.y,
         text,
-        color: COLORS[Math.floor(Math.random() * COLORS.length)],
-        width: 200,
-        height: 50,
+        color: selectedNodeColor, // Use selected node background color for new nodes
+        textColor: selectedColor, // Use selected text color for new nodes
+        width: nodeWidth, // Smaller default width on mobile
+        height: initialHeight, // Use calculated initial height
+        shape: selectedShape, // Use selected shape for new nodes
+        style: nodeStyle, // Use selected node style for new nodes
         isEditing: true,
       };
       setNodes((prev) => [...prev, newNode]);
       return newNode.id;
     },
-    [nodes]
+    [nodes, isMobile, selectedColor, selectedNodeColor, selectedShape, nodeStyle, findNonOverlappingPosition]
   );
 
   const createNodeWithText = useCallback(
     (text: string) => {
-      // Create node at center of viewport (adjusted for mobile)
-      const centerX = window.innerWidth / 2 - 100;
+      // Create node at center of viewport (optimized for mobile)
+      const centerX = window.innerWidth / 2 - (isMobile ? 90 : 100);
       const centerY = (window.innerHeight / 2) - 25 + (isMobile ? 50 : 0); // Offset for mobile
       
-      // Calculate text dimensions to auto-size the node
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      if (context) {
-        context.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-        const textMetrics = context.measureText(text);
-        const textWidth = textMetrics.width;
-        const textHeight = 20; // Approximate line height
-        
-        // Calculate node dimensions with padding (adjusted for mobile)
-        const padding = 20;
-        const minWidth = isMobile ? 180 : 200; // Slightly smaller on mobile
-        const minHeight = 50;
-        const maxWidth = Math.min(window.innerWidth - (isMobile ? 40 : 100), isMobile ? 500 : 600); // Adjusted for mobile
-        
-        const nodeWidth = Math.max(minWidth, Math.min(textWidth + padding * 2, maxWidth));
-        const nodeHeight = Math.max(minHeight, textHeight + padding * 2);
-        
-        // Create node with calculated dimensions
-        const newNode: Node = {
-          id: generateId(),
-          x: centerX,
-          y: centerY,
-          text,
-          color: COLORS[Math.floor(Math.random() * COLORS.length)],
-          width: nodeWidth,
-          height: nodeHeight,
-          isEditing: true,
-        };
-        
-        setNodes((prev) => [...prev, newNode]);
-        return newNode.id;
-      } else {
-        // Fallback to default createNode if canvas context is not available
-        return createNode(centerX, centerY, text);
-      }
+      // Calculate text dimensions to auto-size the node based on actual content
+      const tempDiv = document.createElement('div');
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.visibility = 'hidden';
+      tempDiv.style.whiteSpace = 'pre-wrap';
+      tempDiv.style.wordBreak = 'break-words';
+      tempDiv.style.fontSize = isMobile ? '16px' : '14px';
+      tempDiv.style.fontWeight = '500';
+      tempDiv.style.lineHeight = '1.6';
+      tempDiv.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      tempDiv.style.padding = '16px';
+      tempDiv.style.width = '300px'; // Start with a reasonable width
+      tempDiv.style.height = 'auto';
+      tempDiv.textContent = text || "Double-click to edit";
+      
+      document.body.appendChild(tempDiv);
+      const rect = tempDiv.getBoundingClientRect();
+      const contentWidth = rect.width;
+      const contentHeight = rect.height;
+      document.body.removeChild(tempDiv);
+      
+      // Calculate node dimensions with padding
+      const padding = isMobile ? 8 : 12;
+      const minWidth = isMobile ? 160 : 200;
+      const maxWidth = Math.min(window.innerWidth - (isMobile ? 32 : 100), isMobile ? 400 : 600);
+      
+      // Use actual content dimensions - no fixed minimum height
+      const nodeWidth = Math.max(minWidth, Math.min(contentWidth + padding * 2, maxWidth));
+      const nodeHeight = contentHeight + padding * 2;
+      
+      // Find non-overlapping position
+      const position = findNonOverlappingPosition(centerX, centerY, nodeWidth, nodeHeight);
+      
+      // Create node with calculated dimensions
+      const newNode: Node = {
+        id: generateId(),
+        x: position.x,
+        y: position.y,
+        text,
+        color: selectedNodeColor, // Use selected node background color for new nodes
+        textColor: selectedColor, // Use selected text color for new nodes
+        width: nodeWidth,
+        height: nodeHeight,
+        shape: selectedShape, // Use selected shape for new nodes
+        style: nodeStyle, // Use selected node style for new nodes
+        isEditing: true,
+      };
+      
+      setNodes((prev) => [...prev, newNode]);
+      return newNode.id;
     },
-    [createNode]
+    [createNode, isMobile, selectedColor, selectedNodeColor, selectedShape, nodeStyle]
   );
   
 
@@ -243,12 +334,28 @@ const Canvas: React.FC = () => {
         const clampedX = Math.max(minX, Math.min(newX, maxX));
         const clampedY = Math.max(minY, Math.min(newY, maxY));
         
+        // Check for collisions with other nodes
+        const wouldCollide = checkCollision(clampedX, clampedY, currentNode.width, currentNode.height, nodeId);
+        
+        setDragCollision(wouldCollide);
+        
+        // Always update position during drag, but mark collision state
         updateNode(nodeId, { x: clampedX, y: clampedY });
       }
     };
 
     const handleDragEnd = () => {
+      // If there's a collision when drag ends, find a safe position
+      if (dragCollision && dragState.nodeId) {
+        const currentNode = nodes.find(n => n.id === dragState.nodeId);
+        if (currentNode) {
+          const safePosition = findNonOverlappingPosition(currentNode.x, currentNode.y, currentNode.width, currentNode.height);
+          updateNode(dragState.nodeId, { x: safePosition.x, y: safePosition.y });
+        }
+      }
+      
       setDragState(prev => ({ ...prev, isDragging: false, nodeId: null }));
+      setDragCollision(false);
       document.removeEventListener('mousemove', handleDragMove);
       document.removeEventListener('mouseup', handleDragEnd);
       document.removeEventListener('touchmove', handleDragMove);
@@ -312,6 +419,32 @@ const Canvas: React.FC = () => {
         text: nextText,
         undoStack: undoStack.slice(-10), // Keep only last 10 text changes
         redoStack: redoStack
+      });
+    }
+  };
+
+
+
+  // Mobile navigation functions
+  const handleMobileNavLeft = () => {
+    if (scrollContainerRef.current) {
+      const currentScroll = scrollContainerRef.current.scrollLeft;
+      const scrollAmount = window.innerWidth * 0.8; // Scroll 80% of viewport width
+      scrollContainerRef.current.scrollTo({
+        left: Math.max(0, currentScroll - scrollAmount),
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const handleMobileNavRight = () => {
+    if (scrollContainerRef.current) {
+      const currentScroll = scrollContainerRef.current.scrollLeft;
+      const scrollAmount = window.innerWidth * 0.8; // Scroll 80% of viewport width
+      const maxScroll = scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth;
+      scrollContainerRef.current.scrollTo({
+        left: Math.min(maxScroll, currentScroll + scrollAmount),
+        behavior: 'smooth'
       });
     }
   };
@@ -625,6 +758,11 @@ const Canvas: React.FC = () => {
     }
   };
 
+  // Render connection lines
+  const renderConnections = () => {
+    return null; // Temporarily disabled to fix issues
+  };
+
   useEffect(() => {
     if (nodes.length === 0) {
       setShowNodeList(false);
@@ -676,6 +814,18 @@ const Canvas: React.FC = () => {
 
   return (
     <div className="relative w-full h-screen bg-gray-50">
+      {/* Desktop Sidebar - Only show on desktop */}
+      {!isMobile && (
+        <DesktopSidebar
+          selectedColor={selectedColor}
+          onColorChange={setSelectedColor}
+          selectedNodeColor={selectedNodeColor}
+          onNodeColorChange={setSelectedNodeColor}
+          nodeStyle={nodeStyle}
+          onNodeStyleChange={setNodeStyle}
+        />
+      )}
+
       <Toolbar
         onAddNode={() => createNode(100, 100)}
         onToggleAI={() => setShowAIAssistant(!showAIAssistant)}
@@ -684,6 +834,10 @@ const Canvas: React.FC = () => {
         onExportImage={exportToImage}
         toggleList={() => setShowNodeList(!showNodeList)}
         showNodeList={showNodeList}
+        selectedColor={selectedColor}
+        onColorChange={setSelectedColor}
+        selectedNodeColor={selectedNodeColor}
+        onNodeColorChange={setSelectedNodeColor}
       />
 
       <div
@@ -692,7 +846,9 @@ const Canvas: React.FC = () => {
         style={{ 
           height: isMobile ? 'calc(100vh - 90px)' : 'calc(100vh - 40px)', // Increased height for mobile
           paddingTop: isMobile ? '90px' : '80px', // Reduced padding for mobile to increase viewport
+          paddingLeft: isMobile ? '0' : '64px', // Add left padding for desktop sidebar
           minHeight: isMobile ? 'calc(100vh - 90px)' : 'calc(100vh - 40px)',
+          minWidth: isMobile ? '200vw' : '100%', // Extra width for mobile scrolling
           WebkitOverflowScrolling: 'touch',
           overflowX: 'auto',
           overflowY: 'auto'
@@ -744,6 +900,7 @@ const Canvas: React.FC = () => {
               onResize={(width, height) => updateNode(node.id, { width, height })}
               onUndo={() => handleNodeUndo(node.id)}
               onRedo={() => handleNodeRedo(node.id)}
+              dragCollision={dragCollision && dragState.nodeId === node.id}
             />
           ))}
 
@@ -760,6 +917,9 @@ const Canvas: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Render Connections */}
+      {renderConnections()}
 
       {showAIAssistant && (
         <AIAssistant
@@ -790,6 +950,29 @@ const Canvas: React.FC = () => {
           }}
           onClose={() => setShowNodeList(false)}
         />
+      )}
+
+      {/* Mobile Navigation Arrows */}
+      {isMobile && (
+        <>
+          {/* Left Arrow */}
+          <button
+            onClick={handleMobileNavLeft}
+            className="fixed left-2 top-1/2 transform -translate-y-1/2 z-40 bg-white/90 backdrop-blur-lg rounded-full p-3 shadow-lg border border-gray-200 hover:bg-white hover:shadow-xl transition-all duration-200"
+            style={{ top: 'calc(50% + 2rem)' }} // Offset for toolbar
+          >
+            <ChevronLeft className="w-6 h-6 text-gray-700" />
+          </button>
+
+          {/* Right Arrow */}
+          <button
+            onClick={handleMobileNavRight}
+            className="fixed right-2 top-1/2 transform -translate-y-1/2 z-40 bg-white/90 backdrop-blur-lg rounded-full p-3 shadow-lg border border-gray-200 hover:bg-white hover:shadow-xl transition-all duration-200"
+            style={{ top: 'calc(50% + 2rem)' }} // Offset for toolbar
+          >
+            <ChevronRight className="w-6 h-6 text-gray-700" />
+          </button>
+        </>
       )}
 
       {/* Desktop Context Menu */}
@@ -862,17 +1045,7 @@ const Canvas: React.FC = () => {
         document.body
       )}
 
-      {/* Mobile Context Sidebar */}
-      <ContextSidebar
-        isVisible={showContextSidebar}
-        onClose={() => setShowContextSidebar(false)}
-        onToggleAI={() => setShowAIAssistant(!showAIAssistant)}
-        onExportJSON={exportToJSON}
-        onExportImage={exportToImage}
-        onToggleNodeList={() => setShowNodeList(!showNodeList)}
-        showNodeList={showNodeList}
-        onAddNodeWithText={createNodeWithText}
-      />
+
       
     </div>
   );

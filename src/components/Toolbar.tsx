@@ -18,6 +18,10 @@ interface ToolbarProps {
   onExportImage: () => void;
   toggleList: () => void;
   showNodeList: boolean;
+  selectedColor: string;
+  onColorChange: (color: string) => void;
+  selectedNodeColor: string;
+  onNodeColorChange: (color: string) => void;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -28,6 +32,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onExportImage,
   toggleList,
   showNodeList,
+  selectedColor,
+  onColorChange,
+  selectedNodeColor,
+  onNodeColorChange,
 }) => {
   const viewportHeight = useViewportHeight();
   
@@ -40,10 +48,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
   
   return (
           <div 
-        className={`fixed left-2 sm:left-4 z-50 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 bg-white/95 backdrop-blur-lg rounded-xl p-2 sm:p-3 shadow-xl border border-gray-200 max-w-[calc(100vw-1rem)] sm:max-w-[calc(100vw-2rem)] transition-all duration-300 ${
+        className={`fixed z-50 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 bg-white/95 backdrop-blur-lg rounded-xl p-2 sm:p-3 shadow-xl border border-gray-200 max-w-[calc(100vw-1rem)] sm:max-w-[calc(100vw-2rem)] transition-all duration-300 ${
           isKeyboardOpen && !isMobile ? 'bottom-4 top-auto' : 'top-0'
         }`}
         style={{
+          left: window.innerWidth >= 768 ? '88px' : '8px', // Move toolbar further right on desktop to avoid sidebar overlap
           top: window.innerWidth >= 768 ? '1rem' : (isKeyboardOpen && !isMobile ? 'auto' : Math.max(8, Math.min(viewportHeight * 0.02, 16)) + 'px'),
           bottom: isKeyboardOpen && !isMobile ? '1rem' : 'auto',
           position: 'fixed',
@@ -55,7 +64,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         aria-label="Canvas Studio toolbar with quick actions"
       >
       <a 
-        href="https://www.statisfy.com/" 
+        href="https://sandeep-portfolio-iitk.vercel.app/" 
         target="_blank" 
         rel="noopener noreferrer"
         className="flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 shadow-sm flex-shrink-0 hover:shadow-md transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 active:scale-95"
@@ -64,7 +73,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           zIndex: 51,
           position: 'relative'
         }}
-        aria-label="Visit Statisfy website - Opens in new tab"
+        aria-label="Visit Sandeep's portfolio - Opens in new tab"
         role="link"
         tabIndex={0}
       >
@@ -90,7 +99,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             Canvas Studio
           </span>
           <span className="text-gray-500 text-xs leading-tight hidden sm:block">
-            Statisfy demo
+            Portfolio
           </span>
         </div>
       </a>
@@ -98,17 +107,21 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
 
       {/* Toolbar Buttons */}
-      <ToolbarActions
-        onAddNode={onAddNode}
-        onToggleAI={onToggleAI}
-        showAI={showAI}
-        onExportJSON={onExportJSON}
-        onExportImage={onExportImage}
-        toggleList={toggleList}
-        showNodeList={showNodeList}
-        className="flex flex-wrap items-center gap-0.5 sm:gap-1 text-xs sm:text-sm"
-        aria-label="Toolbar action buttons"
-      />
+                        <ToolbarActions
+                    onAddNode={onAddNode}
+                    onToggleAI={onToggleAI}
+                    showAI={showAI}
+                    onExportJSON={onExportJSON}
+                    onExportImage={onExportImage}
+                    toggleList={toggleList}
+                    showNodeList={showNodeList}
+                    selectedColor={selectedColor}
+                    onColorChange={onColorChange}
+                    selectedNodeColor={selectedNodeColor}
+                    onNodeColorChange={onNodeColorChange}
+                    className="flex flex-wrap items-center gap-0.5 sm:gap-1 text-xs sm:text-sm"
+                    aria-label="Toolbar action buttons"
+                  />
     </div>
   );
 };

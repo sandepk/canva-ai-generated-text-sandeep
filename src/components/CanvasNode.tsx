@@ -14,6 +14,7 @@ interface CanvasNodeProps {
   onResize: (width: number, height: number) => void;
   onUndo: () => void;
   onRedo: () => void;
+  dragCollision?: boolean;
 }
 
 const CanvasNode: React.FC<CanvasNodeProps> = ({
@@ -28,6 +29,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
   onResize,
   onUndo,
   onRedo,
+  dragCollision = false,
 }) => {
   const [editText, setEditText] = useState(node.text);
   const [showActions, setShowActions] = useState(false);
@@ -35,6 +37,9 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
   const [resizing, setResizing] = useState(false);
   const nodeRef = useRef<HTMLDivElement>(null);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Detect mobile mode
+  const isMobile = window.innerWidth < 768;
 
   useEffect(() => {
     if (node.isEditing && textareaRef.current) {
@@ -47,16 +52,21 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
     setEditText(node.text);
   }, [node.text]);
 
-  // Auto-resize node when text changes (but not during editing or manual resizing)
+  // Auto-resize node when text changes (optimized for mobile)
   useEffect(() => {
     if (!node.isEditing && !resizing) {
-      // Only auto-resize if the node hasn't been manually resized recently
-      const hasBeenManuallyResized = node.width !== 200; // Check if width was changed from default
-      if (!hasBeenManuallyResized) {
-        autoResizeNode(node.text, true); // Immediate resize when not editing
+      // On mobile, always auto-resize to fit content exactly
+      if (isMobile) {
+        autoResizeNode(node.text, true);
+      } else {
+        // On desktop, only auto-resize if the node hasn't been manually resized recently
+        const hasBeenManuallyResized = node.width !== 200;
+        if (!hasBeenManuallyResized) {
+          autoResizeNode(node.text, true);
+        }
       }
     }
-  }, [node.text, node.isEditing, resizing, node.width]);
+  }, [node.text, node.isEditing, resizing, node.width, isMobile]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -71,13 +81,13 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       onSave(editText);
-      // Auto-resize after saving
-      setTimeout(() => autoResizeNode(editText, true), 100);
+      // Auto-resize after saving (immediate on mobile)
+      setTimeout(() => autoResizeNode(editText, isMobile), isMobile ? 0 : 100);
     } else if (e.key === "Escape") {
       setEditText(node.text);
       onSave(node.text);
-      // Auto-resize after saving
-      setTimeout(() => autoResizeNode(node.text, true), 100);
+      // Auto-resize after saving (immediate on mobile)
+      setTimeout(() => autoResizeNode(node.text, isMobile), isMobile ? 0 : 100);
     } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
       e.preventDefault();
       // Only allow undo if there are text changes to undo
@@ -102,10 +112,18 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      
+      // On mobile, immediately resize the node to match textarea height
+      if (isMobile) {
+        const newHeight = textareaRef.current.scrollHeight + 32; // Add padding
+        if (Math.abs(newHeight - node.height) > 5) {
+          onResize(node.width, newHeight);
+        }
+      }
     }
   };
 
-  // Calculate required dimensions based on text content
+  // Calculate required dimensions based on text content (optimized for mobile)
   const calculateTextDimensions = (text: string) => {
     // Create a temporary div to measure text dimensions
     const tempDiv = document.createElement('div');
@@ -113,12 +131,13 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
     tempDiv.style.visibility = 'hidden';
     tempDiv.style.whiteSpace = 'pre-wrap';
     tempDiv.style.wordBreak = 'break-words';
-    tempDiv.style.fontSize = '14px'; // text-sm
+    tempDiv.style.fontSize = isMobile ? '16px' : '14px'; // Use mobile font size
     tempDiv.style.fontWeight = '500'; // font-medium
     tempDiv.style.lineHeight = '1.6'; // Consistent with display
-    tempDiv.style.padding = '16px'; // p-4
-    tempDiv.style.width = `${node.width - 32}px`; // Use current node width minus padding
+    tempDiv.style.padding = '8px'; // p-2 - reduced padding
+    tempDiv.style.width = `${node.width - 16}px`; // Use current node width minus padding
     tempDiv.style.height = 'auto';
+    tempDiv.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     tempDiv.textContent = text || "Double-click to edit";
     
     // Handle empty text case
@@ -133,16 +152,17 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
     
     document.body.removeChild(tempDiv);
     
-    // Calculate final dimensions - keep width fixed, only adjust height
-    const padding = 32; // 16px on each side
-    const resizeHandlePadding = 24; // Extra padding for resize handle (6px * 4)
+    // Calculate final dimensions - height based on actual content only
+    const padding = 16; // 8px on each side - reduced padding
+    
+    // Use actual content height with minimal padding - no fixed minimum
     const width = node.width; // Keep current width
-    const height = Math.max(50, contentHeight + padding + resizeHandlePadding);
+    const height = contentHeight + padding;
     
     return { width, height };
   };
 
-  // Auto-resize node based on text content with debouncing
+  // Auto-resize node based on text content (optimized for mobile)
   const autoResizeNode = (text: string, immediate: boolean = false) => {
     // Clear existing timeout
     if (resizeTimeoutRef.current) {
@@ -154,36 +174,48 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
       const currentHeight = node.height;
       const currentWidth = node.width;
       
-      // Check if node has been manually resized
-      const hasBeenManuallyResized = currentWidth !== 200;
-      
-      if (hasBeenManuallyResized) {
-        // If manually resized, only adjust height to fit content
+      if (isMobile) {
+        // On mobile, always resize to fit content exactly
         const heightDiff = Math.abs(height - currentHeight);
-        if (heightDiff > 10) {
-          onResize(currentWidth, height); // Keep current width, adjust height
+        if (heightDiff > 5) { // Smaller threshold for mobile
+          onResize(currentWidth, height);
         }
       } else {
-        // If not manually resized, allow both width and height adjustments
-        const widthDiff = Math.abs(width - currentWidth);
-        const heightDiff = Math.abs(height - currentHeight);
+        // On desktop, check if node has been manually resized
+        const hasBeenManuallyResized = currentWidth !== 200;
         
-        if (widthDiff > 10 || heightDiff > 10) {
-          onResize(width, height);
+        if (hasBeenManuallyResized) {
+          // If manually resized, only adjust height to fit content
+          const heightDiff = Math.abs(height - currentHeight);
+          if (heightDiff > 10) {
+            onResize(currentWidth, height);
+          }
+        } else {
+          // If not manually resized, allow both width and height adjustments
+          const widthDiff = Math.abs(width - currentWidth);
+          const heightDiff = Math.abs(height - currentHeight);
+          
+          if (widthDiff > 10 || heightDiff > 10) {
+            onResize(width, height);
+          }
         }
       }
     };
 
-    if (immediate) {
+    if (immediate || isMobile) {
       performResize();
     } else {
-      // Debounce resize to avoid too frequent updates during typing
+      // Debounce resize to avoid too frequent updates during typing (desktop only)
       resizeTimeoutRef.current = setTimeout(performResize, 300);
     }
   };
 
-  // Resize logic
-  const handleResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
+
+
+  // Resize logic (disabled on mobile for better UX)
+    const handleResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
+    if (isMobile) return; // Disable manual resizing on mobile
+    
     e.preventDefault();
     e.stopPropagation();
     setResizing(true);
@@ -195,8 +227,26 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
     const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
       const moveX = moveEvent instanceof TouchEvent ? moveEvent.touches[0].clientX : (moveEvent as MouseEvent).clientX;
       const moveY = moveEvent instanceof TouchEvent ? moveEvent.touches[0].clientY : (moveEvent as MouseEvent).clientY;
-      const newWidth = Math.max(150, startWidth + (moveX - startX));
-      const newHeight = Math.max(60, startHeight + (moveY - startY));
+      
+      // Calculate new dimensions
+      let newWidth = Math.max(150, startWidth + (moveX - startX));
+      let newHeight = Math.max(20, startHeight + (moveY - startY));
+      
+      // Ensure text fits within the node bounds
+      const textLength = node.text.length;
+      const fontSize = isMobile ? 16 : 14;
+      const lineHeight = fontSize * 1.6;
+      const padding = 16; // 8px on each side
+      
+      // Calculate minimum width needed for text
+      const minTextWidth = Math.max(150, textLength * fontSize * 0.6 + padding * 2);
+      newWidth = Math.max(newWidth, minTextWidth);
+      
+      // Calculate minimum height needed for text
+      const lines = Math.ceil((textLength * fontSize * 0.6) / (newWidth - padding * 2));
+      const minTextHeight = Math.max(20, lines * lineHeight + padding * 2);
+      newHeight = Math.max(newHeight, minTextHeight);
+      
       onResize(newWidth, newHeight);
     };
 
@@ -219,43 +269,69 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
       ref={nodeRef}
       data-node="true"
       data-node-id={node.id}
-      className={`absolute select-none touch-none group transition-all duration-300 ease-out ${
-        isDragging ? "scale-105 z-50" : "hover:scale-105"
+      className={`absolute select-none touch-none group ${
+        isMobile 
+          ? "" // No animations on mobile for better performance
+          : `transition-all duration-300 ease-out ${isDragging ? "scale-105 z-50" : "hover:scale-105"}`
       } ${highlighted ? "ring-4 ring-green-400 animate-pulse" : ""} ${
         resizing ? "ring-2 ring-blue-400" : ""
       }`}
-      style={{
-        left: node.x,
-        top: node.y,
-        width: node.width,
-        minHeight: node.height,
-        height: node.height,
-        zIndex: resizing ? 100 : undefined,
-      }}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
+                      style={{
+                  left: node.x,
+                  top: node.y,
+                  width: node.width,
+                  height: node.height,
+                  zIndex: resizing ? 100 : undefined,
+                }}
+      onMouseEnter={() => !isMobile && setShowActions(true)}
+      onMouseLeave={() => !isMobile && setShowActions(false)}
       onContextMenu={e => e.stopPropagation()}
     >
-      <div
-        className="relative w-full h-full rounded-lg border-2 border-white shadow-md transition-all duration-200 cursor-move"
-        style={{
-          backgroundColor: node.color + "15",
-          borderColor: node.color + "40",
-        }}
+                        <div
+                    className={`relative w-full h-full border-2 shadow-md ${
+                      isMobile ? "" : "transition-all duration-200"
+                    } cursor-move ${
+                      node.shape === 'circle' ? 'rounded-full' : 'rounded-lg'
+                    } ${dragCollision && isDragging ? 'ring-4 ring-red-500 animate-pulse' : ''}`}
+                    style={{
+                      backgroundColor: dragCollision && isDragging 
+                        ? 'rgba(239, 68, 68, 0.15)' 
+                        : node.style === 'crystal' 
+                        ? 'rgba(255, 255, 255, 0.1)' 
+                        : node.style === 'colored'
+                        ? node.color
+                        : '#fef3c7',
+                      borderColor: dragCollision && isDragging 
+                        ? '#ef4444' 
+                        : node.style === 'crystal' 
+                        ? node.color + "40"
+                        : node.style === 'colored'
+                        ? node.color
+                        : '#f59e0b',
+                      backdropFilter: node.style === 'crystal' ? 'blur(10px)' : 'none',
+                      boxShadow: node.style === 'crystal'
+                        ? '0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                        : node.style === 'colored'
+                        ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                        : '0 4px 8px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+                      transform: node.style === 'crystal' || node.style === 'colored' ? undefined : 'rotate(-1deg)',
+                    }}
         onMouseDown={onMouseDown}
         onTouchStart={onMouseDown}
         onDoubleClick={handleDoubleClick}
       >
-        {/* Drag Handle */}
-        <div
-          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-          style={{ pointerEvents: showActions ? "auto" : "none" }}
-        >
-          <GripHorizontal className="w-4 h-4 text-gray-400" />
-        </div>
+        {/* Drag Handle - Hidden on mobile */}
+        {!isMobile && (
+          <div
+            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+            style={{ pointerEvents: showActions ? "auto" : "none" }}
+          >
+            <GripHorizontal className="w-4 h-4 text-gray-400" />
+          </div>
+        )}
 
         {/* Content */}
-        <div className="p-4 w-full h-full overflow-hidden">
+        <div className="p-2 w-full h-full overflow-hidden">
           {node.isEditing ? (
             <textarea
               ref={textareaRef}
@@ -265,19 +341,32 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
                 adjustTextareaHeight();
               }}
               onKeyDown={handleKeyDown}
-              onBlur={() => {
+              onBlur={(e) => {
                 onSave(editText);
-                // Auto-resize after saving
-                setTimeout(() => autoResizeNode(editText, true), 100);
+                // Auto-resize after saving (immediate on mobile)
+                setTimeout(() => autoResizeNode(editText, isMobile), isMobile ? 0 : 100);
+                // When not focused, keep placeholder on one line
+                if (!e.target.value) {
+                  e.target.style.whiteSpace = 'nowrap';
+                }
               }}
-              className="w-full bg-transparent border-none outline-none resize-none text-gray-800 font-medium text-sm leading-relaxed overflow-hidden pr-6 pb-6"
-              style={{ minHeight: "60px", lineHeight: '1.6' }}
+              className="w-full bg-transparent border-none outline-none resize-none font-medium text-sm leading-relaxed overflow-hidden pr-6 pb-6"
+              style={{ 
+                lineHeight: '1.6',
+                fontSize: isMobile ? '16px' : '14px', // Larger font on mobile for better readability
+                whiteSpace: 'pre-wrap', // Allow content wrapping
+                color: node.textColor || '#1f2937' // Use node's text color or default
+              }}
               placeholder="Type your text here..."
             />
           ) : (
             <div
-              className="w-full h-full text-gray-800 font-medium text-sm leading-relaxed whitespace-pre-wrap break-words cursor-text overflow-hidden pr-6 pb-6"
-              style={{ lineHeight: '1.6' }}
+              className="w-full h-full font-medium text-sm leading-relaxed whitespace-pre-wrap break-words cursor-text overflow-hidden pr-6 pb-6"
+              style={{ 
+                lineHeight: '1.6',
+                fontSize: isMobile ? '16px' : '14px', // Larger font on mobile
+                color: node.textColor || '#1f2937' // Use node's text color or default
+              }}
               onClick={handleDoubleClick}
             >
               {node.text || "Double-click to edit"}
@@ -285,8 +374,8 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
           )}
         </div>
 
-        {/* Resize Handle */}
-        {showActions && !node.isEditing && (
+        {/* Resize Handle - Hidden on mobile */}
+        {!isMobile && showActions && !node.isEditing && (
           <div
             className={`absolute bottom-2 right-2 w-6 h-6 bg-white/95 backdrop-blur-sm border border-gray-300 rounded cursor-nwse-resize flex items-center justify-center z-30 shadow-md hover:bg-white hover:shadow-lg transition-all duration-200 ${
               resizing ? "bg-blue-50 border-blue-300 shadow-lg" : ""
@@ -309,9 +398,15 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
           </div>
         )}
 
-        {/* Action Buttons */}
-        {showActions && (
-          <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+
+
+        {/* Action Buttons - Always visible on mobile when editing */}
+        {(showActions || (isMobile && node.isEditing)) && (
+          <div className={`absolute -top-2 -right-2 flex gap-1 ${
+            isMobile 
+              ? "opacity-100" // Always visible on mobile when editing
+              : "opacity-100 transition-all duration-200"
+          }`}>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -342,6 +437,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
             >
               <RotateCw className="w-3 h-3" />
             </button>
+
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -374,6 +470,8 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
             </button>
           </div>
         )}
+
+
       </div>
     </div>
   );
