@@ -355,7 +355,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
                 lineHeight: '1.6',
                 fontSize: isMobile ? '16px' : '14px', // Larger font on mobile for better readability
                 whiteSpace: 'pre-wrap', // Allow content wrapping
-                color: node.textColor || '#1f2937' // Use node's text color or default
+                color: node.textColor || '#000000' // Use node's text color or default to black
               }}
               placeholder="Type your text here..."
             />
@@ -365,7 +365,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
               style={{ 
                 lineHeight: '1.6',
                 fontSize: isMobile ? '16px' : '14px', // Larger font on mobile
-                color: node.textColor || '#1f2937' // Use node's text color or default
+                color: node.textColor || '#000000' // Use node's text color or default to black
               }}
               onClick={handleDoubleClick}
             >

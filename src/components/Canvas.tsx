@@ -55,8 +55,8 @@ const Canvas: React.FC = () => {
   }>({ visible: false, x: 0, y: 0 });
   const [showContextSidebar, setShowContextSidebar] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
-  const [selectedColor, setSelectedColor] = useState(COLORS[0]); // Global text color for new nodes
-  const [selectedNodeColor, setSelectedNodeColor] = useState('#3B82F6'); // Global node background color for new nodes
+  const [selectedColor, setSelectedColor] = useState('#000000'); // Global text color for new nodes (black)
+  const [selectedNodeColor, setSelectedNodeColor] = useState('#fef3c7'); // Global node background color for new nodes (yellow)
   const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle'>('rectangle'); // Global shape for new nodes
   const [nodeStyle, setNodeStyle] = useState<'colored' | 'crystal'>('colored'); // Global node style for new nodes
   const [connections, setConnections] = useState<Connection[]>([]);
