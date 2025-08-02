@@ -152,11 +152,11 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
     
     document.body.removeChild(tempDiv);
     
-    // Calculate final dimensions - height based on actual content only
+    // Calculate final dimensions - only adjust height, keep width constant
     const padding = 16; // 8px on each side - reduced padding
     
-    // Use actual content height with minimal padding - no fixed minimum
-    const width = node.width; // Keep current width
+    // Keep the current width unchanged
+    const width = node.width;
     const height = contentHeight + padding;
     
     return { width, height };
@@ -174,30 +174,18 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
       const currentHeight = node.height;
       const currentWidth = node.width;
       
+      // Only adjust height, keep width constant
+      const heightDiff = Math.abs(height - currentHeight);
+      
       if (isMobile) {
-        // On mobile, always resize to fit content exactly
-        const heightDiff = Math.abs(height - currentHeight);
+        // On mobile, resize height if there's a significant difference
         if (heightDiff > 5) { // Smaller threshold for mobile
           onResize(currentWidth, height);
         }
       } else {
-        // On desktop, check if node has been manually resized
-        const hasBeenManuallyResized = currentWidth !== 200;
-        
-        if (hasBeenManuallyResized) {
-          // If manually resized, only adjust height to fit content
-          const heightDiff = Math.abs(height - currentHeight);
-          if (heightDiff > 10) {
-            onResize(currentWidth, height);
-          }
-        } else {
-          // If not manually resized, allow both width and height adjustments
-          const widthDiff = Math.abs(width - currentWidth);
-          const heightDiff = Math.abs(height - currentHeight);
-          
-          if (widthDiff > 10 || heightDiff > 10) {
-            onResize(width, height);
-          }
+        // On desktop, resize height if there's a significant difference
+        if (heightDiff > 10) {
+          onResize(currentWidth, height);
         }
       }
     };
@@ -206,7 +194,7 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
       performResize();
     } else {
       // Debounce resize to avoid too frequent updates during typing (desktop only)
-      resizeTimeoutRef.current = setTimeout(performResize, 300);
+      resizeTimeoutRef.current = setTimeout(performResize, 100); // Reduced debounce time
     }
   };
 
@@ -228,24 +216,35 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
       const moveX = moveEvent instanceof TouchEvent ? moveEvent.touches[0].clientX : (moveEvent as MouseEvent).clientX;
       const moveY = moveEvent instanceof TouchEvent ? moveEvent.touches[0].clientY : (moveEvent as MouseEvent).clientY;
       
-      // Calculate new dimensions
-      let newWidth = Math.max(150, startWidth + (moveX - startX));
+      // Calculate new dimensions based on mouse movement
+      let newWidth = Math.max(120, startWidth + (moveX - startX));
       let newHeight = Math.max(20, startHeight + (moveY - startY));
       
-      // Ensure text fits within the node bounds
-      const textLength = node.text.length;
+      // For manual resizing, allow the user to control the width freely
+      // Only apply minimum constraints, not text-based constraints
+      const padding = 16; // 8px on each side
+      const minWidth = 120; // Minimum width for usability
+      const maxWidth = 800; // Maximum width to prevent excessive resizing
+      
+      // Apply width constraints
+      newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+      
+      // Calculate height based on text content fitting in the new width
       const fontSize = isMobile ? 16 : 14;
       const lineHeight = fontSize * 1.6;
-      const padding = 16; // 8px on each side
+      const textLength = node.text.length;
       
-      // Calculate minimum width needed for text
-      const minTextWidth = Math.max(150, textLength * fontSize * 0.6 + padding * 2);
-      newWidth = Math.max(newWidth, minTextWidth);
+      // Calculate how many lines the text will take in the new width
+      const availableWidth = newWidth - padding * 2;
+      const avgCharWidth = fontSize * 0.6;
+      const charsPerLine = Math.floor(availableWidth / avgCharWidth);
       
-      // Calculate minimum height needed for text
-      const lines = Math.ceil((textLength * fontSize * 0.6) / (newWidth - padding * 2));
-      const minTextHeight = Math.max(20, lines * lineHeight + padding * 2);
-      newHeight = Math.max(newHeight, minTextHeight);
+      if (charsPerLine > 0) {
+        const lines = Math.ceil(textLength / charsPerLine);
+        const contentHeight = lines * lineHeight;
+        const minTextHeight = Math.max(20, contentHeight + padding * 2);
+        newHeight = Math.max(newHeight, minTextHeight);
+      }
       
       onResize(newWidth, newHeight);
     };
@@ -339,6 +338,8 @@ const CanvasNode: React.FC<CanvasNodeProps> = ({
               onChange={(e) => {
                 setEditText(e.target.value);
                 adjustTextareaHeight();
+                // Auto-resize height on text change with debouncing
+                setTimeout(() => autoResizeNode(e.target.value, false), 50);
               }}
               onKeyDown={handleKeyDown}
               onBlur={(e) => {
