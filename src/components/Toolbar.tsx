@@ -16,6 +16,7 @@ interface ToolbarProps {
   showAI: boolean;
   onExportJSON: () => void;
   onExportImage: () => void;
+  isExportingImage?: boolean;
   toggleList: () => void;
   showNodeList: boolean;
   selectedColor: string;
@@ -30,6 +31,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   showAI,
   onExportJSON,
   onExportImage,
+  isExportingImage = false,
   toggleList,
   showNodeList,
   selectedColor,
@@ -113,6 +115,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     showAI={showAI}
                     onExportJSON={onExportJSON}
                     onExportImage={onExportImage}
+                    isExportingImage={isExportingImage}
                     toggleList={toggleList}
                     showNodeList={showNodeList}
                     selectedColor={selectedColor}

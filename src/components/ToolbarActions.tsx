@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Bot, FileDown, Image as ImageIcon, ListIcon, Palette } from "lucide-react";
+import { Plus, Bot, FileDown, Image as ImageIcon, ListIcon, Palette, Loader2 } from "lucide-react";
 
 interface ToolbarActionsProps {
   onAddNode: () => void;
@@ -7,6 +7,7 @@ interface ToolbarActionsProps {
   showAI: boolean;
   onExportJSON: () => void;
   onExportImage: () => void;
+  isExportingImage?: boolean;
   toggleList: () => void;
   showNodeList: boolean;
   selectedColor: string;
@@ -23,6 +24,7 @@ const ToolbarActions: React.FC<ToolbarActionsProps> = ({
   showAI,
   onExportJSON,
   onExportImage,
+  isExportingImage = false,
   toggleList,
   showNodeList,
   selectedColor,
@@ -75,12 +77,23 @@ const ToolbarActions: React.FC<ToolbarActionsProps> = ({
     <span className="text-gray-300 hidden sm:inline" aria-hidden="true">/</span>
     <button
       onClick={onExportImage}
-      className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 text-gray-700 hover:bg-yellow-50 hover:text-yellow-700 rounded-md transition-all duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-1"
-      title="Export as Image"
-      aria-label="Export canvas as PNG image"
+      disabled={isExportingImage}
+      className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md transition-all duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-1 ${
+        isExportingImage
+          ? "bg-yellow-100 text-yellow-700 cursor-not-allowed"
+          : "text-gray-700 hover:bg-yellow-50 hover:text-yellow-700"
+      }`}
+      title={isExportingImage ? "Exporting..." : "Export as Image"}
+      aria-label={isExportingImage ? "Exporting canvas as PNG image" : "Export canvas as PNG image"}
     >
-      <ImageIcon className="w-4 h-4" aria-hidden="true" />
-      <span className="hidden sm:inline">Export Image</span>
+      {isExportingImage ? (
+        <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+      ) : (
+        <ImageIcon className="w-4 h-4" aria-hidden="true" />
+      )}
+      <span className="hidden sm:inline">
+        {isExportingImage ? "Exporting..." : "Export Image"}
+      </span>
     </button>
     <span className="text-gray-300 hidden sm:inline" aria-hidden="true">/</span>
     <button

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, startTransition } from "react";
 import { createPortal } from "react-dom";
 import html2canvas from "html2canvas";
 import { Node, DragState, Connection } from "../types";
@@ -7,7 +7,7 @@ import AIAssistant from "./AIAssistant";
 import Toolbar from "./Toolbar";
 import DesktopSidebar from "./DesktopSidebar";
 import { generateText } from "../services/api";
-import { Plus, Bot, FileDown, Image as ImageIcon, ListIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Bot, FileDown, Image as ImageIcon, ListIcon, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import NodeList from "./NodeList";
 
 
@@ -61,6 +61,7 @@ const Canvas: React.FC = () => {
   const [nodeStyle, setNodeStyle] = useState<'colored' | 'crystal'>('colored'); // Global node style for new nodes
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connectingNode, setConnectingNode] = useState<{ nodeId: string; port: 'top' | 'right' | 'bottom' | 'left' } | null>(null);
+  const [isExportingImage, setIsExportingImage] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -640,6 +641,11 @@ const Canvas: React.FC = () => {
 
   const exportToImage = async () => {
     if (!canvasRef.current) return;
+
+    startTransition(() => {
+      setIsExportingImage(true);
+    });
+
     try {
       // Calculate the bounds of all nodes to determine the full canvas area
       let minX = 0, minY = 0, maxX = window.innerWidth, maxY = window.innerHeight;
@@ -755,6 +761,10 @@ const Canvas: React.FC = () => {
       a.click();
     } catch (err) {
       console.error("Failed to export image:", err);
+    } finally {
+      startTransition(() => {
+        setIsExportingImage(false);
+      });
     }
   };
 
@@ -832,6 +842,7 @@ const Canvas: React.FC = () => {
         showAI={showAIAssistant}
         onExportJSON={exportToJSON}
         onExportImage={exportToImage}
+        isExportingImage={isExportingImage}
         toggleList={() => setShowNodeList(!showNodeList)}
         showNodeList={showNodeList}
         selectedColor={selectedColor}
